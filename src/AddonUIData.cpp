@@ -41,7 +41,7 @@ AddonUIData::AddonUIData(ShaderManager* pixelShaderManager, ShaderManager* verte
 {
 	_toggleGroupIdShaderEditing = -1;
 	_toggleGroupIdKeyBindingEditing = -1;
-	_overlayOpacity = 1.0f;
+	_overlayOpacity = 0.2f;
 }
 
 

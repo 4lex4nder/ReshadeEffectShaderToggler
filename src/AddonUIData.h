@@ -38,7 +38,7 @@
 #include "ToggleGroup.h"
 #include "ConstantHandler.h"
 
-#define FRAMECOUNT_COLLECTION_PHASE_DEFAULT 250;
+#define FRAMECOUNT_COLLECTION_PHASE_DEFAULT 10;
 #define HASH_FILE_NAME	"ReshadeEffectShaderToggler.ini"
 
 using namespace reshade::api;
@@ -64,7 +64,7 @@ namespace AddonImGui
 		atomic_int _toggleGroupIdConstantEditing = -1;
 		std::unordered_map<int, ToggleGroup> _toggleGroups;
 		int _startValueFramecountCollectionPhase = FRAMECOUNT_COLLECTION_PHASE_DEFAULT;
-		float _overlayOpacity = 1.0f;
+		float _overlayOpacity = 0.2f;
 	public:
 		AddonUIData(ShaderManager* pixelShaderManager, ShaderManager* vertexShaderManager, ConstantHandler* constants, atomic_uint32_t* activeCollectorFrameCounter,
 			vector<string>* techniques, unordered_map<string, tuple<constant_type, vector<effect_uniform_variable>>>*);

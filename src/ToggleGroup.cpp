@@ -37,14 +37,14 @@
 
 namespace ShaderToggler
 {
-	ToggleGroup::ToggleGroup(std::string name, int id): _id(id), _isActive(false), _isEditing(false), _allowAllTechniques(false),
+	ToggleGroup::ToggleGroup(std::string name, int id): _id(id), _isActive(false), _isEditing(false), _allowAllTechniques(true),
 		_isProvidingTextureBinding(false), _textureBindingName("")
 	{
 		_name = name.size() > 0 ? name : "Default";
 	}
 
 
-	ToggleGroup::ToggleGroup(): _name(""), _id(0), _isActive(false), _isEditing(false), _allowAllTechniques(false),
+	ToggleGroup::ToggleGroup(): _name(""), _id(0), _isActive(false), _isEditing(false), _allowAllTechniques(true),
 		_isProvidingTextureBinding(false), _textureBindingName("")
 	{
 

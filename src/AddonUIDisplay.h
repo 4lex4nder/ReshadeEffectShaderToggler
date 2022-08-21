@@ -333,7 +333,7 @@ static void DisplaySettings(AddonImGui::AddonUIData& instance, effect_runtime* r
 	{
 		ImGui::AlignTextToFramePadding();
 		ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.5f);
-		ImGui::SliderFloat("Overlay opacity", instance.OverlayOpacity(), 0.2f, 1.0f);
+		ImGui::SliderFloat("Overlay opacity", instance.OverlayOpacity(), 0.0f, 1.0f);
 		ImGui::AlignTextToFramePadding();
 		ImGui::SliderInt("# of frames to collect", instance.StartValueFramecountCollectionPhase(), 10, 1000);
 		ImGui::SameLine();
