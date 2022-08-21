@@ -81,6 +81,16 @@ namespace ShaderToggler
 	}
 
 
+	void KeyData::resetKey()
+	{
+		_altRequired = false;
+		_ctrlRequired = false;
+		_shiftRequired = false;
+		_keyCode = 0;
+		_keyAsString = "";
+	}
+
+
 	void KeyData::collectKeysPressed(const reshade::api::effect_runtime* runtime)
 	{
 		// keys below 7 aren't interesting.
@@ -99,10 +109,10 @@ namespace ShaderToggler
 						_altRequired = runtime->is_key_down(VK_MENU);
 						_ctrlRequired = runtime->is_key_down(VK_CONTROL);
 						_shiftRequired = runtime->is_key_down(VK_SHIFT);
+						setKeyAsString();
 					}
 			}
 		}
-		setKeyAsString();
 	}
 
 

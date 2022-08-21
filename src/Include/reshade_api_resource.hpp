@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2021 Patrick Mours
- * License: https://github.com/crosire/reshade#license
+ * SPDX-License-Identifier: BSD-3-Clause OR MIT
  */
 
 #pragma once
@@ -453,7 +453,7 @@ namespace reshade::api
 		load,
 		clear,
 		discard,
-		dont_care
+		no_access
 	};
 
 	/// <summary>
@@ -463,7 +463,7 @@ namespace reshade::api
 	{
 		store,
 		discard,
-		dont_care
+		no_access
 	};
 
 	/// <summary>

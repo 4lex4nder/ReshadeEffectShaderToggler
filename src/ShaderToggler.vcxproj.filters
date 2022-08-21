@@ -36,6 +36,21 @@
     <ClInclude Include="KeyData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="AddonUIData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AddonUIDisplay.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\ExternalVariablesPipe.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ConstantHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AddonUIConstants.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -51,6 +66,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="KeyData.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="AddonUIData.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ExternalVariablesPipe.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ConstantHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

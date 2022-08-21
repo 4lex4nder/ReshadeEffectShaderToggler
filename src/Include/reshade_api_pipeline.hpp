@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2021 Patrick Mours
- * License: https://github.com/crosire/reshade#license
+ * SPDX-License-Identifier: BSD-3-Clause OR MIT
  */
 
 #pragma once
@@ -295,6 +295,8 @@ namespace reshade::api
 		triangle_list = 4,
 		triangle_strip = 5,
 		triangle_fan = 6,
+		quad_list = 8,
+		quad_strip = 9,
 		line_list_adj = 10,
 		line_strip_adj = 11,
 		triangle_list_adj = 12,
@@ -643,7 +645,7 @@ namespace reshade::api
 		/// <seealso cref="pipeline_stage::compute_shader"/>
 		compute_shader,
 		/// <summary>
-		/// Vertex layout for the input-assembler stage. 
+		/// Vertex layout for the input-assembler stage.
 		/// Sub-object data is a pointer to an array of <see cref="input_element"/>.
 		/// </summary>
 		/// <seealso cref="pipeline_stage::input_assembler"/>

@@ -79,6 +79,7 @@ namespace ShaderToggler
 		std::string getKeyAsString() { return _keyAsString;}
 		uint8_t getKeyCode() { return _keyCode;}
 		bool isValid() { return _keyCode > 0; }
+		void resetKey();
 
 	private:
 		static std::string vkCodeToString(uint8_t vkCode);

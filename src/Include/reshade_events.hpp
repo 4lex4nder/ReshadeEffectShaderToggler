@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2021 Patrick Mours
- * License: https://github.com/crosire/reshade#license
+ * SPDX-License-Identifier: BSD-3-Clause OR MIT
  */
 
 #pragma once
@@ -585,6 +585,9 @@ namespace reshade
 		/// <item><description>ID3D12Device::CreateComputePipelineState</description></item>
 		/// <item><description>ID3D12Device::CreateGraphicsPipelineState</description></item>
 		/// <item><description>ID3D12Device2::CreatePipelineState</description></item>
+		/// <item><description>ID3D12PipelineLibrary::LoadComputePipeline</description></item>
+		/// <item><description>ID3D12PipelineLibrary::LoadGraphicsPipeline</description></item>
+		/// <item><description>ID3D12PipelineLibrary1::LoadPipeline</description></item>
 		/// <item><description>glLinkProgram</description></item>
 		/// <item><description>vkCreateComputePipelines</description></item>
 		/// <item><description>vkCreateGraphicsPipelines</description></item>
@@ -1478,6 +1481,12 @@ namespace reshade
 		/// </remarks>
 		reshade_overlay,
 
+		/// <summary>
+		/// Called after a screenshot was taken and saved to disk.
+		/// <para>Callback function signature: <c>void (api::effect_runtime *runtime, const char *filename)</c></para>
+		/// </summary>
+		reshade_screenshot,
+
 #ifdef RESHADE_ADDON
 		max // Last value used internally by ReShade to determine number of events in this enum
 #endif
@@ -1603,4 +1612,5 @@ namespace reshade
 	RESHADE_DEFINE_ADDON_EVENT_TRAITS(addon_event::reshade_set_technique_state, bool, api::effect_runtime *runtime, api::effect_technique technique, bool enabled);
 
 	RESHADE_DEFINE_ADDON_EVENT_TRAITS(addon_event::reshade_overlay, void, api::effect_runtime *runtime);
+	RESHADE_DEFINE_ADDON_EVENT_TRAITS(addon_event::reshade_screenshot, void, api::effect_runtime *runtime, const char *filename);
 }

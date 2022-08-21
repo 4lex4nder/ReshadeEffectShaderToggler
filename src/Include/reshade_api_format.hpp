@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2021 Patrick Mours
- * License: https://github.com/crosire/reshade#license
+ * SPDX-License-Identifier: BSD-3-Clause OR MIT
  */
 
 #pragma once
@@ -148,6 +148,19 @@ namespace reshade::api
 		// Special purpose formats
 
 		intz = 0x5A544E49,
+	};
+
+	/// <summary>
+	/// The available color space types for presentation.
+	/// </summary>
+	enum class color_space : uint32_t
+	{
+		unknown = 0,
+
+		srgb_nonlinear,
+		extended_srgb_linear,
+		hdr10_st2084,
+		hdr10_hlg,
 	};
 
 	/// <summary>

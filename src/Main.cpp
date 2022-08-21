@@ -29,42 +29,74 @@
 // OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////
-
 #define IMGUI_DISABLE_INCLUDE_IMCONFIG_H
 #define ImTextureID unsigned long long // Change ImGui texture ID type to that of a 'reshade::api::resource_view' handle
 
 #include <imgui.h>
 #include <reshade.hpp>
+#include <vector>
+#include <unordered_map>
+#include <set>
+#include <functional>
+#include <tuple>
+#include <chrono>
 #include "crc32_hash.hpp"
 #include "ShaderManager.h"
 #include "CDataFile.h"
 #include "ToggleGroup.h"
-#include <vector>
+#include "AddonUIData.h"
+#include "AddonUIDisplay.h"
+#include "ConstantHandler.h"
 
 using namespace reshade::api;
 using namespace ShaderToggler;
+using namespace AddonImGui;
+using namespace ConstantFeedback;
 
-extern "C" __declspec(dllexport) const char *NAME = "Shader Toggler";
-extern "C" __declspec(dllexport) const char *DESCRIPTION = "Add-on which allows you to define groups of game shaders to toggle on/off with one key press.";
+extern "C" __declspec(dllexport) const char *NAME = "Reshade Effect Shader Toggler";
+extern "C" __declspec(dllexport) const char *DESCRIPTION = "Addon which allows you to define groups of shaders to render Reshade effects on.";
 
-struct __declspec(uuid("038B03AA-4C75-443B-A695-752D80797037")) CommandListDataContainer {
+struct __declspec(uuid("222F7169-3C09-40DB-9BC9-EC53842CE537")) CommandListDataContainer {
     uint64_t activePixelShaderPipeline;
     uint64_t activeVertexShaderPipeline;
+	vector<resource_view> active_rtv_history = vector<resource_view>(MAX_RT_HISTORY);
+	unordered_set < pair<string, int32_t>,
+		decltype([](const pair<string, int32_t>& v) {
+			return std::hash<std::string>{}(v.first); // Don't care about history index, we'll overwrite them in case of collisions
+		}),
+		decltype([](const pair<string, int32_t>& lhs, const pair<string, int32_t>& rhs) {
+			return lhs.first == rhs.first;
+		})> immediateActionSet;
 };
 
-#define FRAMECOUNT_COLLECTION_PHASE_DEFAULT 250;
-#define HASH_FILE_NAME	"ShaderToggler.ini"
+struct __declspec(uuid("C63E95B1-4E2F-46D6-A276-E8B4612C069A")) DeviceDataContainer {
+	effect_runtime* current_runtime = nullptr;
+	unordered_map<string, bool> allEnabledTechniques;
+	unordered_map<string, int32_t> techniquesToRender;
+	unordered_map<string, int32_t> bindingsToUpdate;
+	unordered_map<string, constant_type> rest_variables;
+	unordered_map<string, tuple<resource, reshade::api::format, resource_view, resource_view>> bindingMap;
+	unordered_set<string> bindingsUpdated;
+	unordered_set<const ToggleGroup*> constantsUpdated;
+};
+
+#define CHAR_BUFFER_SIZE 256
+#define MAX_EFFECT_HANDLES 128
+#define REST_VAR_ANNOTATION "source"
 
 static ShaderToggler::ShaderManager g_pixelShaderManager;
 static ShaderToggler::ShaderManager g_vertexShaderManager;
-static KeyData g_keyCollector;
+static ConstantHandler constantHandler;
 static atomic_uint32_t g_activeCollectorFrameCounter = 0;
-static std::vector<ToggleGroup> g_toggleGroups;
-static atomic_int g_toggleGroupIdKeyBindingEditing = -1;
-static atomic_int g_toggleGroupIdShaderEditing = -1;
-static float g_overlayOpacity = 1.0f;
-static int g_startValueFramecountCollectionPhase = FRAMECOUNT_COLLECTION_PHASE_DEFAULT;
-
+static vector<string> allTechniques;
+static unordered_map<string, tuple<constant_type, vector<effect_uniform_variable>>> g_restVariables;
+static AddonUIData g_addonUIData(&g_pixelShaderManager, &g_vertexShaderManager, &constantHandler, &g_activeCollectorFrameCounter, &allTechniques, &g_restVariables);
+static std::shared_mutex device_data_mutex;
+static std::shared_mutex resource_mutex;
+static char g_charBuffer[CHAR_BUFFER_SIZE];
+static size_t g_charBufferSize = CHAR_BUFFER_SIZE;
+static const float clearColor[] = { 0, 0, 0, 0 };
+static unordered_set<uintptr_t> s_resources;
 
 /// <summary>
 /// Calculates a crc32 hash from the passed in shader bytecode. The hash is used to identity the shader in future runs.
@@ -83,71 +115,106 @@ static uint32_t calculateShaderHash(void* shaderData)
 }
 
 
-/// <summary>
-/// Adds a default group with VK_CAPITAL as toggle key. Only used if there aren't any groups defined in the ini file.
-/// </summary>
-void addDefaultGroup()
+static void enumerateTechniques(effect_runtime* runtime, std::function<void(effect_runtime*, effect_technique, string&)> func)
 {
-	ToggleGroup toAdd("Default", ToggleGroup::getNewGroupId());
-	toAdd.setToggleKey(VK_CAPITAL, false, false, false);
-	g_toggleGroups.push_back(toAdd);
+	runtime->enumerate_techniques(nullptr, [func](effect_runtime* rt, effect_technique technique) {
+		g_charBufferSize = CHAR_BUFFER_SIZE;
+		rt->get_technique_name(technique, g_charBuffer, &g_charBufferSize);
+		string name(g_charBuffer);
+		func(rt, technique, name);
+		});
 }
 
 
-/// <summary>
-/// Loads the defined hashes and groups from the shaderToggler.ini file.
-/// </summary>
-void loadShaderTogglerIniFile()
+static void enumerateRESTUniformVariables(effect_runtime* runtime, std::function<void(effect_runtime*, effect_uniform_variable, constant_type&, string&)> func)
 {
-	// Will assume it's started at the start of the application and therefore no groups are present.
-
-	CDataFile iniFile;
-	if(!iniFile.Load(HASH_FILE_NAME))
-	{
-		// not there
-		return;
-	}
-	int groupCounter = 0;
-	const int numberOfGroups = iniFile.GetInt("AmountGroups", "General");
-	if(numberOfGroups==INT_MIN)
-	{
-		// old format file?
-		addDefaultGroup();
-		groupCounter=-1;	// enforce old format read for pre 1.0 ini file.
-	}
-	else
-	{
-		for(int i=0;i<numberOfGroups;i++)
+	runtime->enumerate_uniform_variables(nullptr, [func](effect_runtime* rt, effect_uniform_variable variable) {
+		g_charBufferSize = CHAR_BUFFER_SIZE;
+		if (!rt->get_annotation_string_from_uniform_variable(variable, REST_VAR_ANNOTATION, g_charBuffer))
 		{
-			g_toggleGroups.push_back(ToggleGroup("", ToggleGroup::getNewGroupId()));
+			return;
 		}
-	}
-	for(auto& group: g_toggleGroups)
-	{
-		group.loadState(iniFile, groupCounter);		// groupCounter is normally 0 or greater. For when the old format is detected, it's -1 (and there's 1 group).
-		groupCounter++;
-	}
+
+		string id(g_charBuffer);
+
+		reshade::api::format format;
+		uint32_t rows;
+		uint32_t columns;
+		uint32_t array_length;
+
+		rt->get_uniform_variable_type(variable, &format, &rows, &columns, &array_length);
+		constant_type type = constant_type::type_unknown;
+		switch (format)
+		{
+		case reshade::api::format::r32_float:
+			if (array_length > 0)
+				type = constant_type::type_unknown;
+			else
+			{
+				if (rows == 4 && columns == 4)
+					type = constant_type::type_float4x4;
+				else if (rows == 3 && columns == 3)
+					type = constant_type::type_float3x3;
+				else if (rows == 3 && columns == 1)
+					type = constant_type::type_float3;
+				else if (rows == 2 && columns == 1)
+					type = constant_type::type_float2;
+				else if (rows == 1 && columns == 1)
+					type = constant_type::type_float;
+				else
+					type = constant_type::type_unknown;
+			}
+			break;
+		case reshade::api::format::r32_sint:
+			if (array_length > 0 || rows > 1 || columns > 1)
+				type = constant_type::type_unknown;
+			else
+				type = constant_type::type_int;
+			break;
+		case reshade::api::format::r32_uint:
+			if (array_length > 0 || rows > 1 || columns > 1)
+				type = constant_type::type_unknown;
+			else
+				type = constant_type::type_uint;
+			break;
+		}
+
+		if (type == constant_type::type_unknown)
+		{
+			return;
+		}
+
+		func(rt, variable, type, id);
+		});
+}
+
+static void reloadConstantVariables(effect_runtime* runtime)
+{
+	g_restVariables.clear();
+
+	enumerateRESTUniformVariables(runtime, [](effect_runtime* runtime, effect_uniform_variable variable, constant_type& type, string& name) {
+		if (!g_restVariables.contains(name))
+		{
+			g_restVariables.emplace(name, make_tuple(type, vector<effect_uniform_variable>()));
+		}
+
+		if (type == std::get<0>(g_restVariables[name]))
+		{
+			std::get<1>(g_restVariables[name]).push_back(variable);
+		}
+		});
 }
 
 
-/// <summary>
-/// Saves the currently known toggle groups with their shader hashes to the shadertoggler.ini file
-/// </summary>
-void saveShaderTogglerIniFile()
+static void onInitDevice(device* device)
 {
-	// format: first section with # of groups, then per group a section with pixel and vertex shaders, as well as their name and key value.
-	// groups are stored with "Group" + group counter, starting with 0.
-	CDataFile iniFile;
-	iniFile.SetInt("AmountGroups", g_toggleGroups.size(), "",  "General");
+	device->create_private_data<DeviceDataContainer>();
+}
 
-	int groupCounter = 0;
-	for(const auto& group: g_toggleGroups)
-	{
-		group.saveState(iniFile, groupCounter);
-		groupCounter++;
-	}
-	iniFile.SetFileName(HASH_FILE_NAME);
-	iniFile.Save();
+
+static void onDestroyDevice(device* device)
+{
+	device->destroy_private_data<DeviceDataContainer>();
 }
 
 
@@ -165,8 +232,228 @@ static void onDestroyCommandList(command_list *commandList)
 static void onResetCommandList(command_list *commandList)
 {
 	CommandListDataContainer &commandListData = commandList->get_private_data<CommandListDataContainer>();
+
 	commandListData.activePixelShaderPipeline = -1;
 	commandListData.activeVertexShaderPipeline = -1;
+	commandListData.active_rtv_history.clear();
+}
+
+
+static void onInitResource(device* device, const resource_desc& desc, const subresource_data*, resource_usage usage, reshade::api::resource handle)
+{
+	std::unique_lock<shared_mutex> lock(resource_mutex);
+
+	if (static_cast<uint32_t>(desc.usage & resource_usage::constant_buffer))
+	{
+		s_resources.emplace(handle.handle);
+	}
+}
+
+
+static void onDestroyResource(device* device, resource res)
+{
+	std::unique_lock<shared_mutex> lock(resource_mutex);
+
+	s_resources.erase(res.handle);
+}
+
+
+static void onPresent(command_queue* queue, swapchain* swapchain, const rect*, const rect*, uint32_t, const rect*)
+{
+	std::unique_lock<shared_mutex> lock(device_data_mutex);
+	CommandListDataContainer& commandListData = queue->get_private_data<CommandListDataContainer>();
+	DeviceDataContainer& deviceData = queue->get_device()->get_private_data<DeviceDataContainer>();
+
+	deviceData.techniquesToRender.clear();
+
+	std::for_each(deviceData.allEnabledTechniques.begin(), deviceData.allEnabledTechniques.end(), [](auto& el) {
+		el.second = false;
+		});
+
+	deviceData.bindingsUpdated.clear();
+}
+
+
+static void onReshadeReloadedEffects(effect_runtime* runtime)
+{
+	std::unique_lock<shared_mutex> lock(device_data_mutex);
+	DeviceDataContainer& data = runtime->get_device()->get_private_data<DeviceDataContainer>();
+	data.allEnabledTechniques.clear();
+	allTechniques.clear();
+
+	enumerateTechniques(data.current_runtime, [&data](effect_runtime* runtime, effect_technique technique, string& name) {
+		allTechniques.push_back(name);
+		bool enabled = runtime->get_technique_state(technique);
+	
+		if (enabled)
+		{
+			data.allEnabledTechniques.emplace(name, false);
+		}
+		});
+}
+
+
+static bool onReshadeSetTechniqueState(effect_runtime* runtime, effect_technique technique, bool enabled)
+{
+	DeviceDataContainer& data = runtime->get_device()->get_private_data<DeviceDataContainer>();
+	g_charBufferSize = CHAR_BUFFER_SIZE;
+	runtime->get_technique_name(technique, g_charBuffer, &g_charBufferSize);
+	string techName(g_charBuffer);
+
+	if (!enabled)
+	{
+		if (data.allEnabledTechniques.contains(techName))
+		{
+			data.allEnabledTechniques.erase(techName);
+		}
+	}
+	else
+	{
+		if (data.allEnabledTechniques.find(techName) == data.allEnabledTechniques.end())
+		{
+			data.allEnabledTechniques.emplace(techName, false);
+		}
+	}
+
+	return false;
+}
+
+
+static bool CreateTextureBinding(effect_runtime* runtime, resource* res, resource_view* srv, resource_view* rtv, reshade::api::format format)
+{
+	DeviceDataContainer& data = runtime->get_device()->get_private_data<DeviceDataContainer>();
+
+	uint32_t frame_width, frame_height;
+	runtime->get_screenshot_width_and_height(&frame_width, &frame_height);
+
+	runtime->get_command_queue()->wait_idle();
+
+	if (!runtime->get_device()->create_resource(
+		resource_desc(frame_width, frame_height, 1, 1, format_to_typeless(format), 1, memory_heap::gpu_only, resource_usage::copy_dest | resource_usage::shader_resource | resource_usage::render_target),
+		nullptr, resource_usage::shader_resource, res))
+	{
+		reshade::log_message(ERROR, "Failed to create texture binding resource!");
+		return false;
+	}
+
+	if (!runtime->get_device()->create_resource_view(*res, resource_usage::shader_resource, resource_view_desc(format_to_default_typed(format, 0)), srv))
+	{
+		reshade::log_message(ERROR, "Failed to create texture binding resource view!");
+		return false;
+	}
+
+	if (!runtime->get_device()->create_resource_view(*res, resource_usage::render_target, resource_view_desc(format_to_default_typed(format, 0)), rtv))
+	{
+		reshade::log_message(ERROR, "Failed to create texture binding resource view!");
+		return false;
+	}
+
+	return true;
+}
+
+
+static void DestroyTextureBinding(effect_runtime* runtime, std::string binding)
+{
+	DeviceDataContainer& data = runtime->get_device()->get_private_data<DeviceDataContainer>();
+
+	if (data.bindingMap.contains(binding))
+	{
+		resource res = { 0 };
+		resource_view srv = { 0 };
+		resource_view rtv = { 0 };
+
+		runtime->get_command_queue()->wait_idle();
+
+		res = std::get<0>(data.bindingMap[binding]);
+		if (res != 0)
+		{
+			runtime->get_device()->destroy_resource(res);
+		}
+
+		srv = std::get<2>(data.bindingMap[binding]);
+		if (srv != 0)
+		{
+			runtime->get_device()->destroy_resource_view(srv);
+		}
+
+		rtv = std::get<3>(data.bindingMap[binding]);
+		if (rtv != 0)
+		{
+			runtime->get_device()->destroy_resource_view(rtv);
+		}
+	}
+}
+
+
+static bool UpdateTextureBinding(effect_runtime* runtime, std::string binding, reshade::api::format format)
+{
+	DeviceDataContainer& data = runtime->get_device()->get_private_data<DeviceDataContainer>();
+
+	if (data.bindingMap.contains(binding))
+	{
+		reshade::api::format oldFormat = std::get<1>(data.bindingMap[binding]);
+		if (format != oldFormat)
+		{
+			DestroyTextureBinding(runtime, binding);
+
+			resource res = {};
+			resource_view srv = {};
+			resource_view rtv = {};
+
+			if (CreateTextureBinding(runtime, &res, &srv, &rtv, format))
+			{
+				data.bindingMap[binding] = std::make_tuple(res, format, srv, rtv);
+				runtime->update_texture_bindings(binding.c_str(), srv);
+			}
+			else
+			{
+				return false;
+			}
+		}
+	}
+	else
+	{
+		return false;
+	}
+
+	return true;
+}
+
+
+static void onInitEffectRuntime(effect_runtime* runtime)
+{
+	DeviceDataContainer& data = runtime->get_device()->get_private_data<DeviceDataContainer>();
+	data.current_runtime = runtime;
+
+	// Initialize texture bindings with default format
+	for (auto& group : g_addonUIData.GetToggleGroups())
+	{
+		if (group.second.isProvidingTextureBinding() && group.second.getTextureBindingName().length() > 0)
+		{
+			resource res = {};
+			resource_view srv = {};
+			resource_view rtv = {};
+			
+			if (CreateTextureBinding(runtime, &res, &srv, &rtv, format::r8g8b8a8_unorm))
+			{
+				data.bindingMap.emplace(group.second.getTextureBindingName(), std::make_tuple(res, format::r8g8b8a8_unorm, srv, rtv));
+				runtime->update_texture_bindings(group.second.getTextureBindingName().c_str(), srv);
+			}
+		}
+	}
+}
+
+
+static void onDestroyEffectRuntime(effect_runtime* runtime)
+{
+	DeviceDataContainer& data = runtime->get_device()->get_private_data<DeviceDataContainer>();
+	data.current_runtime = nullptr;
+
+	for (const auto& binding : data.bindingMap)
+	{
+		DestroyTextureBinding(runtime, binding.first);
+	}
+	data.bindingMap.clear();
 }
 
 
@@ -199,512 +486,482 @@ static void onDestroyPipeline(device *device, pipeline pipelineHandle)
 }
 
 
-static void displayIsPartOfToggleGroup()
+/// <summary>
+/// This function will return true if the command list specified has one or more shader hashes which are currently marked. Otherwise false.
+/// </summary>
+/// <param name="commandList"></param>
+/// <returns>true if the draw call has to be blocked</returns>
+bool checkDrawCallForCommandList(command_list* commandList)
 {
-	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
-	ImGui::SameLine();
-	ImGui::Text(" Shader is part of this toggle group.");
-	ImGui::PopStyleColor();
+	if (nullptr == commandList)
+	{
+		return false;
+	}
+
+	CommandListDataContainer& commandListData = commandList->get_private_data<CommandListDataContainer>();
+	DeviceDataContainer& deviceData = commandList->get_device()->get_private_data<DeviceDataContainer>();
+
+	uint32_t psShaderHash = g_pixelShaderManager.getShaderHash(commandListData.activePixelShaderPipeline);
+	uint32_t vsShaderHash = g_vertexShaderManager.getShaderHash(commandListData.activeVertexShaderPipeline);
+
+	vector<const ToggleGroup*> tGroups;
+
+	if ((g_pixelShaderManager.isBlockedShader(psShaderHash) || g_vertexShaderManager.isBlockedShader(vsShaderHash)) &&
+		(g_pixelShaderManager.isInHuntingMode() || g_vertexShaderManager.isInHuntingMode()))
+	{
+		tGroups.push_back(&g_addonUIData.GetToggleGroups()[g_addonUIData.GetToggleGroupIdShaderEditing()]);
+	}
+
+	for (auto& group : g_addonUIData.GetToggleGroups())
+	{
+		if ((group.second.isBlockedPixelShader(psShaderHash) || group.second.isBlockedVertexShader(vsShaderHash)) && group.second.isActive())
+		{
+			tGroups.push_back(&group.second);
+		}
+	}
+
+	for (auto tGroup : tGroups)
+	{
+		if (tGroup->isProvidingTextureBinding())
+		{
+			if (deviceData.bindingsToUpdate.contains(tGroup->getTextureBindingName()))
+			{
+				if (tGroup->getHistoryIndex() < deviceData.bindingsToUpdate[tGroup->getTextureBindingName()])
+					deviceData.bindingsToUpdate[tGroup->getTextureBindingName()] = tGroup->getHistoryIndex();
+			}
+			else
+			{
+				deviceData.bindingsToUpdate.emplace(tGroup->getTextureBindingName(), tGroup->getHistoryIndex());
+			}
+		}
+
+		if (tGroup->getAllowAllTechniques())
+		{
+			for (const auto& tech : deviceData.allEnabledTechniques)
+			{
+				if (!tech.second)
+				{
+					if (deviceData.techniquesToRender.contains(tech.first))
+					{
+						if(tGroup->getHistoryIndex() < deviceData.techniquesToRender[tech.first])
+							deviceData.techniquesToRender[tech.first] = tGroup->getHistoryIndex();
+					}
+					else
+					{
+						deviceData.techniquesToRender.emplace(tech.first, tGroup->getHistoryIndex());
+					}
+				}
+			}
+		}
+		else if (tGroup->preferredTechniques().size() > 0) {
+			for (auto& techName : tGroup->preferredTechniques())
+			{
+				if (deviceData.allEnabledTechniques.contains(techName) && !deviceData.allEnabledTechniques[techName])
+				{
+					if (deviceData.techniquesToRender.contains(techName))
+					{
+						if (tGroup->getHistoryIndex() < deviceData.techniquesToRender[techName])
+							deviceData.techniquesToRender[techName] = tGroup->getHistoryIndex();
+					}
+					else
+					{
+						deviceData.techniquesToRender.emplace(techName, tGroup->getHistoryIndex());
+					}
+				}
+			}
+		}
+	}
+
+	return deviceData.techniquesToRender.size() > 0 || deviceData.bindingsToUpdate.size() > 0;
 }
 
 
-static void onReshadeOverlay(reshade::api::effect_runtime *runtime)
+static const ToggleGroup* checkDescriptors(command_list* commandList)
 {
-	if(g_toggleGroupIdShaderEditing>=0)
+	if (nullptr == commandList)
 	{
-		ImGui::SetNextWindowBgAlpha(g_overlayOpacity);
-		ImGui::SetNextWindowPos(ImVec2(10, 10));
-		if (!ImGui::Begin("ShaderTogglerInfo", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | 
-														ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
+		return nullptr;
+	}
+
+	CommandListDataContainer& commandListData = commandList->get_private_data<CommandListDataContainer>();
+
+	uint32_t psShaderHash = g_pixelShaderManager.getShaderHash(commandListData.activePixelShaderPipeline);
+	uint32_t vsShaderHash = g_vertexShaderManager.getShaderHash(commandListData.activeVertexShaderPipeline);
+
+	vector<const ToggleGroup*> tGroups;
+
+	if ((g_pixelShaderManager.isBlockedShader(psShaderHash) || g_vertexShaderManager.isBlockedShader(vsShaderHash)) &&
+		(g_pixelShaderManager.isInHuntingMode() || g_vertexShaderManager.isInHuntingMode()))
+	{
+		tGroups.push_back(&g_addonUIData.GetToggleGroups()[g_addonUIData.GetToggleGroupIdShaderEditing()]);
+	}
+
+	for (auto& group : g_addonUIData.GetToggleGroups())
+	{
+		if ((group.second.isBlockedPixelShader(psShaderHash) || group.second.isBlockedVertexShader(vsShaderHash)) && group.second.isActive())
 		{
-			ImGui::End();
-			return;
+			tGroups.push_back(&group.second);
 		}
-		string editingGroupName = "";
-		for(auto& group:g_toggleGroups)
+	}
+
+	for (auto tGroup : tGroups)
+	{
+		if (tGroup->getExtractConstants())
 		{
-			if(group.getId()==g_toggleGroupIdShaderEditing)
+			return tGroup;
+		}
+	}
+
+	return nullptr;
+}
+
+
+static resource_view GetCurrentResourceView(const pair<string, int32_t>& matchObject, CommandListDataContainer& commandListData)
+{
+	resource_view active_rtv = { 0 };
+
+	if (commandListData.active_rtv_history.size() > abs(matchObject.second) && matchObject.second <= 0)
+	{
+		active_rtv = commandListData.active_rtv_history[abs(matchObject.second)];
+	}
+	else if (matchObject.second < commandListData.active_rtv_history.size() - 1)
+	{
+		active_rtv = commandListData.active_rtv_history[commandListData.active_rtv_history.size() - 1];
+	}
+	else
+	{
+		active_rtv = commandListData.active_rtv_history[0];
+	}
+
+	return active_rtv;
+}
+
+
+static void UpdateTextureBindings(command_list* cmd_list, bool dec = false)
+{
+	if (cmd_list == nullptr || cmd_list->get_device() == nullptr)
+	{
+		return;
+	}
+
+	device* device = cmd_list->get_device();
+	CommandListDataContainer& commandListData = cmd_list->get_private_data<CommandListDataContainer>();
+	DeviceDataContainer& deviceData = device->get_private_data<DeviceDataContainer>();
+
+	if (deviceData.current_runtime == nullptr || commandListData.active_rtv_history.size() == 0 || deviceData.bindingsToUpdate.size() == 0) {
+		return;
+	}
+
+	for (const auto& binding : deviceData.bindingsToUpdate)
+	{
+		if (binding.second <= 0) {
+			commandListData.immediateActionSet.emplace(binding);
+		}
+	}
+
+	if (commandListData.immediateActionSet.size() == 0)
+	{
+		if (dec)
+		{
+			for (auto& tech : deviceData.bindingsToUpdate)
 			{
-				editingGroupName = group.getName();
-				break;
+				if (deviceData.bindingsToUpdate[tech.first] > 0)
+					deviceData.bindingsToUpdate[tech.first]--;
 			}
+		}
+
+		return;
+	}
+
+	for (const auto& binding : commandListData.immediateActionSet)
+	{
+		string bindingName = binding.first;
+
+		if (deviceData.bindingsUpdated.contains(bindingName)) {
+			continue;
+		}
+
+		resource_view active_rtv = GetCurrentResourceView(binding, commandListData);
+
+		if (active_rtv == 0)
+		{
+			continue;
 		}
 		
-		ImGui::Text("# of pipelines with vertex shaders: %d. # of different vertex shaders gathered: %d.", g_vertexShaderManager.getPipelineCount(), g_vertexShaderManager.getShaderCount());
-		ImGui::Text("# of pipelines with pixel shaders: %d. # of different pixel shaders gathered: %d.", g_pixelShaderManager.getPipelineCount(), g_pixelShaderManager.getShaderCount());
-		if(g_activeCollectorFrameCounter > 0)
+		effect_runtime* runtime = deviceData.current_runtime;
+		if (deviceData.bindingMap.contains(bindingName))
 		{
-			const uint32_t counterValue = g_activeCollectorFrameCounter;
-			ImGui::Text("Collecting active shaders... frames to go: %d", counterValue);
-		}
-		else
-		{
-			if(g_vertexShaderManager.isInHuntingMode() || g_pixelShaderManager.isInHuntingMode())
+			resource res = runtime->get_device()->get_resource_from_view(active_rtv);
+			resource_desc resDesc = runtime->get_device()->get_resource_desc(res);
+			if (UpdateTextureBinding(runtime, bindingName, resDesc.texture.format))
 			{
-				ImGui::Text("Editing the shaders for group: %s", editingGroupName.c_str());
-			}
-			if(g_vertexShaderManager.isInHuntingMode())
-			{
-				ImGui::Text("# of vertex shaders active: %d. # of vertex shaders in group: %d", g_vertexShaderManager.getAmountShaderHashesCollected(), g_vertexShaderManager.getMarkedShaderCount());
-				ImGui::Text("Current selected vertex shader: %d / %d.", g_vertexShaderManager.getActiveHuntedShaderIndex(), g_vertexShaderManager.getAmountShaderHashesCollected());
-				if(g_vertexShaderManager.isHuntedShaderMarked())
-				{
-					displayIsPartOfToggleGroup();
-				}
-			}
-			if(g_pixelShaderManager.isInHuntingMode())
-			{
-				ImGui::Text("# of pixel shaders active: %d. # of pixel shaders in group: %d", g_pixelShaderManager.getAmountShaderHashesCollected(), g_pixelShaderManager.getMarkedShaderCount());
-				ImGui::Text("Current selected pixel shader: %d / %d", g_pixelShaderManager.getActiveHuntedShaderIndex(), g_pixelShaderManager.getAmountShaderHashesCollected());
-				if(g_pixelShaderManager.isHuntedShaderMarked())
-				{
-					displayIsPartOfToggleGroup();
-				}
+				g_addonUIData.cFormat = resDesc.texture.format;
+				cmd_list->copy_resource(res, std::get<0>(deviceData.bindingMap[bindingName]));
+				deviceData.bindingsUpdated.emplace(bindingName);
 			}
 		}
-		ImGui::End();
 	}
+
+	for (auto& tech : commandListData.immediateActionSet)
+	{
+		deviceData.bindingsToUpdate.erase(tech.first);
+	}
+
+	if (dec)
+	{
+		for (auto& tech : deviceData.bindingsToUpdate)
+		{
+			if (deviceData.bindingsToUpdate[tech.first] > 0)
+				deviceData.bindingsToUpdate[tech.first]--;
+		}
+	}
+
+	commandListData.immediateActionSet.clear();
+}
+
+
+static void RenderEffects(command_list* cmd_list, bool inc = false)
+{
+	if (cmd_list == nullptr || cmd_list->get_device() == nullptr)
+	{
+		return;
+	}
+
+	device* device = cmd_list->get_device();
+	CommandListDataContainer& commandListData = cmd_list->get_private_data<CommandListDataContainer>();
+	DeviceDataContainer& deviceData = device->get_private_data<DeviceDataContainer>();
+
+	if (deviceData.current_runtime == nullptr || commandListData.active_rtv_history.size() == 0 || deviceData.techniquesToRender.size() == 0) {
+		return;
+	}
+
+	for (const auto& tech : deviceData.techniquesToRender)
+	{
+		if (tech.second <= 0) {
+			commandListData.immediateActionSet.emplace(tech);
+		}
+	}
+
+	if (commandListData.immediateActionSet.size() == 0)
+	{
+		if (inc)
+		{
+			for (auto& tech : deviceData.techniquesToRender)
+			{
+				if (deviceData.techniquesToRender[tech.first] > 0)
+					deviceData.techniquesToRender[tech.first]--;
+			}
+		}
+
+		return;
+	}
+
+	enumerateTechniques(deviceData.current_runtime, [&deviceData, &commandListData, &cmd_list, &device](effect_runtime* runtime, effect_technique technique, string& name) {
+		auto historic_rtv = commandListData.immediateActionSet.find(pair<string, int32_t>(name, 0));
+
+		if (historic_rtv != commandListData.immediateActionSet.end() && historic_rtv->second <= 0 && !deviceData.allEnabledTechniques[name])
+		{
+			resource_view active_rtv = GetCurrentResourceView(*historic_rtv, commandListData);
+
+			if (active_rtv == 0)
+			{
+				return;
+			}
+
+			resource res = runtime->get_device()->get_resource_from_view(active_rtv);
+			resource_desc resDesc = runtime->get_device()->get_resource_desc(res);
+
+			g_addonUIData.cFormat = resDesc.texture.format;
+
+			deviceData.current_runtime->render_effects(cmd_list, active_rtv);
+			
+			runtime->render_technique(technique, cmd_list, active_rtv);
+			deviceData.allEnabledTechniques[name] = true;
+		}
+		});
+
+	for (auto& tech : commandListData.immediateActionSet)
+	{
+		deviceData.techniquesToRender.erase(tech.first);
+	}
+	if (inc)
+	{
+		for (auto& tech : deviceData.techniquesToRender)
+		{
+
+			if (deviceData.techniquesToRender[tech.first] > 0)
+				deviceData.techniquesToRender[tech.first]--;
+		}
+	}
+
+	commandListData.immediateActionSet.clear();
 }
 
 
 static void onBindPipeline(command_list* commandList, pipeline_stage stages, pipeline pipelineHandle)
 {
-	if(nullptr!=commandList && pipelineHandle.handle!=0)
+	if (nullptr != commandList && pipelineHandle.handle != 0)
 	{
 		const bool handleHasPixelShaderAttached = g_pixelShaderManager.isKnownHandle(pipelineHandle.handle);
 		const bool handleHasVertexShaderAttached = g_vertexShaderManager.isKnownHandle(pipelineHandle.handle);
-		if(!handleHasPixelShaderAttached && !handleHasVertexShaderAttached)
+		if (!handleHasPixelShaderAttached && !handleHasVertexShaderAttached)
 		{
 			// draw call with unknown handle, don't collect it
 			return;
 		}
-		CommandListDataContainer &commandListData = commandList->get_private_data<CommandListDataContainer>();
-		switch(stages)
+		CommandListDataContainer& commandListData = commandList->get_private_data<CommandListDataContainer>();
+
+		if ((uint32_t)(stages & pipeline_stage::pixel_shader) && handleHasPixelShaderAttached)
 		{
-			case pipeline_stage::all:
-				if(g_activeCollectorFrameCounter>0)
-				{
-					// in collection mode
-					if(handleHasPixelShaderAttached)
-					{
-						g_pixelShaderManager.addActivePipelineHandle(pipelineHandle.handle);
-					}
-					if(handleHasVertexShaderAttached)
-					{
-						g_vertexShaderManager.addActivePipelineHandle(pipelineHandle.handle);
-					}
-				}
-				else
-				{
-					commandListData.activePixelShaderPipeline = handleHasPixelShaderAttached ? pipelineHandle.handle : -1;
-					commandListData.activeVertexShaderPipeline = handleHasVertexShaderAttached ? pipelineHandle.handle : -1;
-				}
-				break;	
-			case pipeline_stage::pixel_shader:
-				if(handleHasPixelShaderAttached)
-				{
-					if(g_activeCollectorFrameCounter>0)
-					{
-						// in collection mode
-						g_pixelShaderManager.addActivePipelineHandle(pipelineHandle.handle);
-					}
-					commandListData.activePixelShaderPipeline = pipelineHandle.handle;
-				}
+			if (g_activeCollectorFrameCounter > 0)
+			{
+				// in collection mode
+				g_pixelShaderManager.addActivePipelineHandle(pipelineHandle.handle);
+			}
+			commandListData.activePixelShaderPipeline = pipelineHandle.handle;
+		}
+		else if ((uint32_t)(stages & pipeline_stage::vertex_shader) && handleHasVertexShaderAttached)
+		{
+			if (g_activeCollectorFrameCounter > 0)
+			{
+				// in collection mode
+				g_vertexShaderManager.addActivePipelineHandle(pipelineHandle.handle);
+			}
+			commandListData.activeVertexShaderPipeline = pipelineHandle.handle;
+		}
+
+		std::unique_lock<shared_mutex> lock(device_data_mutex);
+		(void)checkDrawCallForCommandList(commandList);
+
+		UpdateTextureBindings(commandList);
+		RenderEffects(commandList);
+	}
+}
+
+
+static void onBindRenderTargetsAndDepthStencil(command_list* cmd_list, uint32_t count, const resource_view* rtvs, resource_view dsv)
+{
+	if (cmd_list == nullptr || cmd_list->get_device() == nullptr)
+	{
+		return;
+	}
+
+	std::unique_lock<std::shared_mutex> lock(device_data_mutex);
+	UpdateTextureBindings(cmd_list, true);
+	RenderEffects(cmd_list, true);
+	lock.unlock();
+
+	device* device = cmd_list->get_device();
+	CommandListDataContainer& commandListData = cmd_list->get_private_data<CommandListDataContainer>();
+	DeviceDataContainer& deviceData = device->get_private_data<DeviceDataContainer>();
+
+	resource_view new_view = { 0 };
+
+	for (uint32_t i = 0; i < count; i++)
+	{
+		if (deviceData.current_runtime != nullptr && rtvs[i] != 0)
+		{
+			resource rs = device->get_resource_from_view(rtvs[i]);
+			const resource_desc texture_desc = device->get_resource_desc(rs);
+
+			uint32_t frame_width, frame_height;
+			deviceData.current_runtime->get_screenshot_width_and_height(&frame_width, &frame_height);
+			
+			if (texture_desc.texture.height == frame_height && texture_desc.texture.width == frame_width)
+			{
+				new_view = rtvs[i];
 				break;
-			case pipeline_stage::vertex_shader:
-				if(handleHasVertexShaderAttached)
-				{
-					if(g_activeCollectorFrameCounter>0)
-					{
-						// in collection mode
-						g_vertexShaderManager.addActivePipelineHandle(pipelineHandle.handle);
-					}
-					commandListData.activeVertexShaderPipeline = pipelineHandle.handle;
-				}
-				break;
+			}
+		}
+	}
+	
+	if (new_view != 0)
+	{
+		if (commandListData.active_rtv_history.size() >= MAX_RT_HISTORY)
+		{
+			commandListData.active_rtv_history.pop_back();
+		}
+
+		commandListData.active_rtv_history.insert(commandListData.active_rtv_history.begin(), new_view);
+	}
+}
+
+
+static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
+{
+	DeviceDataContainer& deviceData = runtime->get_device()->get_private_data<DeviceDataContainer>();
+
+	enumerateTechniques(deviceData.current_runtime, [&deviceData](effect_runtime* runtime, effect_technique technique, string& name) {
+		if (deviceData.allEnabledTechniques.contains(name) && deviceData.techniquesToRender.size() > 0)
+		{
+			deviceData.current_runtime->set_technique_state(technique, false);
+		}
+		});
+}
+
+
+static void onReshadeFinishEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
+{
+	DeviceDataContainer& deviceData = runtime->get_device()->get_private_data<DeviceDataContainer>();
+
+	enumerateTechniques(deviceData.current_runtime, [&deviceData](effect_runtime* runtime, effect_technique technique, string& name) {
+		if (deviceData.allEnabledTechniques.contains(name) && deviceData.techniquesToRender.size() > 0)
+		{
+			deviceData.current_runtime->set_technique_state(technique, true);
+		}
+		});
+}
+
+
+static void onPushDescriptors(command_list* cmd_list, shader_stage stages, pipeline_layout layout, uint32_t layout_param, const descriptor_set_update& update)
+{
+	const ToggleGroup* group = nullptr;
+	if (update.type == descriptor_type::constant_buffer && static_cast<uint32_t>(stages & shader_stage::pixel) && (group = checkDescriptors(cmd_list)) != nullptr)
+	{
+		DeviceDataContainer& deviceData = cmd_list->get_device()->get_private_data<DeviceDataContainer>();
+	
+		if (deviceData.constantsUpdated.contains(group))
+		{
+			return;
+		}
+	
+		const buffer_range* buffer = static_cast<const reshade::api::buffer_range*>(update.descriptors);
+	
+		for (uint32_t i = update.array_offset; i < update.count; ++i)
+		{
+			if (!s_resources.contains(buffer[i].buffer.handle))
+				continue;
+
+			constantHandler.SetBufferRange(group, buffer[i],
+				cmd_list->get_device(), cmd_list, deviceData.current_runtime->get_command_queue());
+	
+			constantHandler.ApplyConstantValues(deviceData.current_runtime, group, g_restVariables);
+			deviceData.constantsUpdated.insert(group);
+			break;
 		}
 	}
 }
 
 
-/// <summary>
-/// This function will return true if the command list specified has one or more shader hashes which are currently marked to be hidden. Otherwise false.
-/// </summary>
-/// <param name="commandList"></param>
-/// <returns>true if the draw call has to be blocked</returns>
-bool blockDrawCallForCommandList(command_list* commandList)
+static void onReshadeOverlay(effect_runtime* runtime)
 {
-	if(nullptr==commandList)
-	{
-		return false;
-	}
-
-	const CommandListDataContainer &commandListData = commandList->get_private_data<CommandListDataContainer>();
-	uint32_t shaderHash = g_pixelShaderManager.getShaderHash(commandListData.activePixelShaderPipeline);
-	bool blockCall = g_pixelShaderManager.isBlockedShader(shaderHash);
-	for(auto& group : g_toggleGroups)
-	{
-		blockCall |= group.isBlockedPixelShader(shaderHash);
-	}
-	shaderHash = g_vertexShaderManager.getShaderHash(commandListData.activeVertexShaderPipeline);
-	blockCall |= g_vertexShaderManager.isBlockedShader(shaderHash);
-	for(auto& group : g_toggleGroups)
-	{
-		blockCall |= group.isBlockedVertexShader(shaderHash);
-	}
-	return blockCall;
-}
-
-
-static bool onDraw(command_list* commandList, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance)
-{
-	// check if for this command list the active shader handles are part of the blocked set. If so, return true
-	return blockDrawCallForCommandList(commandList);
-}
-
-
-static bool onDrawIndexed(command_list* commandList, uint32_t index_count, uint32_t instance_count, uint32_t first_index, int32_t vertex_offset, uint32_t first_instance)
-{
-	// same as onDraw
-	return blockDrawCallForCommandList(commandList);
-}
-
-
-static bool onDrawOrDispatchIndirect(command_list* commandList, indirect_command type, resource buffer, uint64_t offset, uint32_t draw_count, uint32_t stride)
-{
-	switch(type)
-	{
-		case indirect_command::unknown:
-		case indirect_command::draw:
-		case indirect_command::draw_indexed: 
-			// same as OnDraw
-			return blockDrawCallForCommandList(commandList);
-		// the rest aren't blocked
-	}
-	return false;
+	DisplayOverlay(g_addonUIData, runtime);
 }
 
 
 static void onReshadePresent(effect_runtime* runtime)
 {
-	if(g_activeCollectorFrameCounter>0)
-	{
-		--g_activeCollectorFrameCounter;
-	}
-
-	for(auto& group: g_toggleGroups)
-	{
-		if(group.isToggleKeyPressed(runtime))
-		{
-			group.toggleActive();
-			// if the group's shaders are being edited, it should toggle the ones currently marked.
-			if(group.getId() == g_toggleGroupIdShaderEditing)
-			{
-				g_vertexShaderManager.toggleHideMarkedShaders();
-				g_pixelShaderManager.toggleHideMarkedShaders();
-			}
-		}
-	}
-
-	// hardcoded hunting keys.
-	// If Ctrl is pressed too, it'll step to the next marked shader (if any)
-	// Numpad 1: previous pixel shader
-	// Numpad 2: next pixel shader
-	// Numpad 3: mark current pixel shader as part of the toggle group
-	// Numpad 4: previous vertex shader
-	// Numpad 5: next vertex shader
-	// Numpad 6: mark current vertex shader as part of the toggle group
-	if(runtime->is_key_pressed(VK_NUMPAD1))
-	{
-		g_pixelShaderManager.huntPreviousShader(runtime->is_key_down(VK_CONTROL));
-	}
-	if(runtime->is_key_pressed(VK_NUMPAD2))
-	{
-		g_pixelShaderManager.huntNextShader(runtime->is_key_down(VK_CONTROL));
-	}
-	if(runtime->is_key_pressed(VK_NUMPAD3))
-	{
-		g_pixelShaderManager.toggleMarkOnHuntedShader();
-	}
-	if(runtime->is_key_pressed(VK_NUMPAD4))
-	{
-		g_vertexShaderManager.huntPreviousShader(runtime->is_key_down(VK_CONTROL));
-	}
-	if(runtime->is_key_pressed(VK_NUMPAD5))
-	{
-		g_vertexShaderManager.huntNextShader(runtime->is_key_down(VK_CONTROL));
-	}
-	if(runtime->is_key_pressed(VK_NUMPAD6))
-	{
-		g_vertexShaderManager.toggleMarkOnHuntedShader();
-	}
+	DeviceDataContainer& deviceData = runtime->get_device()->get_private_data<DeviceDataContainer>();
+	deviceData.constantsUpdated.clear();
+	reloadConstantVariables(runtime);
+	CheckHotkeys(g_addonUIData, runtime);
 }
 
 
-/// <summary>
-/// Function which marks the end of a keybinding editing cycle
-/// </summary>
-/// <param name="acceptCollectedBinding"></param>
-/// <param name="groupEditing"></param>
-void endKeyBindingEditing(bool acceptCollectedBinding, ToggleGroup& groupEditing)
+static void displaySettings(effect_runtime* runtime)
 {
-	if (acceptCollectedBinding && g_toggleGroupIdKeyBindingEditing == groupEditing.getId() && g_keyCollector.isValid())
-	{
-		groupEditing.setToggleKey(g_keyCollector);
-	}
-	g_toggleGroupIdKeyBindingEditing = -1;
-	g_keyCollector.clear();
+	DisplaySettings(g_addonUIData, runtime);
 }
-
-
-/// <summary>
-/// Function which marks the start of a keybinding editing cycle for the passed in toggle group
-/// </summary>
-/// <param name="groupEditing"></param>
-void startKeyBindingEditing(ToggleGroup& groupEditing)
-{
-	if (g_toggleGroupIdKeyBindingEditing == groupEditing.getId())
-	{
-		return;
-	}
-	if (g_toggleGroupIdKeyBindingEditing >= 0)
-	{
-		endKeyBindingEditing(false, groupEditing);
-	}
-	g_toggleGroupIdKeyBindingEditing = groupEditing.getId();
-}
-
-
-/// <summary>
-/// Function which marks the end of a shader editing cycle for a given toggle group
-/// </summary>
-/// <param name="acceptCollectedShaderHashes"></param>
-/// <param name="groupEditing"></param>
-void endShaderEditing(bool acceptCollectedShaderHashes, ToggleGroup& groupEditing)
-{
-	if(acceptCollectedShaderHashes && g_toggleGroupIdShaderEditing == groupEditing.getId())
-	{
-		groupEditing.storeCollectedHashes(g_pixelShaderManager.getMarkedShaderHashes(), g_vertexShaderManager.getMarkedShaderHashes());
-		g_pixelShaderManager.stopHuntingMode();
-		g_vertexShaderManager.stopHuntingMode();
-	}
-	g_toggleGroupIdShaderEditing = -1;
-}
-
-
-/// <summary>
-/// Function which marks the start of a shader editing cycle for a given toggle group.
-/// </summary>
-/// <param name="groupEditing"></param>
-void startShaderEditing(ToggleGroup& groupEditing)
-{
-	if(g_toggleGroupIdShaderEditing==groupEditing.getId())
-	{
-		return;
-	}
-	if(g_toggleGroupIdShaderEditing >= 0)
-	{
-		endShaderEditing(false, groupEditing);
-	}
-	g_toggleGroupIdShaderEditing = groupEditing.getId();
-	g_activeCollectorFrameCounter = g_startValueFramecountCollectionPhase;
-	g_pixelShaderManager.startHuntingMode(groupEditing.getPixelShaderHashes());
-	g_vertexShaderManager.startHuntingMode(groupEditing.getVertexShaderHashes());
-
-	// after copying them to the managers, we can now clear the group's shader.
-	groupEditing.clearHashes();
-}
-
-
-static void showHelpMarker(const char* desc)
-{
-	ImGui::TextDisabled("(?)");
-	if (ImGui::IsItemHovered())
-	{
-		ImGui::BeginTooltip();
-		ImGui::PushTextWrapPos(450.0f);
-		ImGui::TextUnformatted(desc);
-		ImGui::PopTextWrapPos();
-		ImGui::EndTooltip();
-	}
-}
-
-
-static void displaySettings(reshade::api::effect_runtime *runtime)
-{
-	if (g_toggleGroupIdKeyBindingEditing >= 0)
-	{
-		// a keybinding is being edited. Read current pressed keys into the collector, cumulatively;
-		g_keyCollector.collectKeysPressed(runtime);
-	}
-
-	if(ImGui::CollapsingHeader("General info and help"))
-	{
-		ImGui::PushTextWrapPos();
-		ImGui::TextUnformatted("The Shader Toggler allows you to create one or more groups with shaders to toggle on/off. You can assign a keyboard shortcut (including using keys like Shift, Alt and Control) to each group, including a handy name. Each group can have one or more vertex or pixel shaders assigned to it. When you press the assigned keyboard shortcut, any draw calls using these shaders will be disabled, effectively hiding the elements in the 3D scene.");
-		ImGui::TextUnformatted("\nThe following (hardcoded) keyboard shortcuts are used when you click a group's 'Change Shaders' button:");
-		ImGui::TextUnformatted("* Numpad 1 and Numpad 2: previous/next pixel shader");
-		ImGui::TextUnformatted("* Ctrl + Numpad 1 and Ctrl + Numpad 2: previous/next marked pixel shader in the group");
-		ImGui::TextUnformatted("* Numpad 3: mark/unmark the current pixel shader as being part of the group");
-		ImGui::TextUnformatted("* Numpad 4 and Numpad 5: previous/next vertex shader");
-		ImGui::TextUnformatted("* Ctrl + Numpad 4 and Ctrl + Numpad 5: previous/next marked vertex shader in the group");
-		ImGui::TextUnformatted("* Numpad 6: mark/unmark the current vertex shader as being part of the group");
-		ImGui::TextUnformatted("\nWhen you step through the shaders, the current shader is disabled in the 3D scene so you can see if that's the shader you were looking for.");
-		ImGui::TextUnformatted("When you're done, make sure you click 'Save all toggle groups' to preserve the groups you defined so next time you start your game they're loaded in and you can use them right away.");
-		ImGui::PopTextWrapPos();
-	}
-
-	ImGui::AlignTextToFramePadding();
-	if(ImGui::CollapsingHeader("Shader selection parameters", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		ImGui::AlignTextToFramePadding();
-		ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.5f);
-			ImGui::SliderFloat("Overlay opacity", &g_overlayOpacity, 0.2f, 1.0f);
-			ImGui::AlignTextToFramePadding();
-			ImGui::SliderInt("# of frames to collect", &g_startValueFramecountCollectionPhase, 10, 1000);
-			ImGui::SameLine();
-			showHelpMarker("This is the number of frames the addon will collect active shaders. Set this to a high number if the shader you want to mark is only used occasionally. Only shaders that are used in the frames collected can be marked.");
-		ImGui::PopItemWidth();
-	}
-	ImGui::Separator();
-
-	if(ImGui::CollapsingHeader("List of Toggle Groups", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		if(ImGui::Button(" New "))
-		{
-			addDefaultGroup();
-		}
-		ImGui::Separator();
-
-		std::vector<ToggleGroup> toRemove;
-		for(auto& group : g_toggleGroups)
-		{
-			ImGui::PushID(group.getId());
-			ImGui::AlignTextToFramePadding();
-			if(ImGui::Button("X"))
-			{
-				toRemove.push_back(group);
-			}
-			ImGui::SameLine();
-			ImGui::Text(" %d ", group.getId());
-			ImGui::SameLine();
-			if(ImGui::Button("Edit"))
-			{
-				group.setEditing(true);
-			}
-
-			ImGui::SameLine();
-			if(g_toggleGroupIdShaderEditing>=0)
-			{
-				if(g_toggleGroupIdShaderEditing==group.getId())
-				{
-					if(ImGui::Button(" Done "))
-					{
-						endShaderEditing(true, group);
-					}
-				}
-				else
-				{
-					ImGui::BeginDisabled(true);
-					ImGui::Button("      ");
-					ImGui::EndDisabled();
-				}
-			}
-			else
-			{
-				if(ImGui::Button("Change shaders"))
-				{
-					ImGui::SameLine();
-					startShaderEditing(group);
-				}
-			}
-			ImGui::SameLine();
-			ImGui::Text(" %s (%s%s)", group.getName().c_str() , group.getToggleKeyAsString().c_str(), group.isActive() ? ", is active" : "");
-			if(group.isEditing())
-			{
-				ImGui::Separator();
-				ImGui::Text("Edit group %d", group.getId());
-
-				// Name of group
-				char tmpBuffer[150];
-				const string& name = group.getName();
-				strncpy_s(tmpBuffer, 150, name.c_str(), name.size());
-				ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.7f);
-					ImGui::AlignTextToFramePadding();
-					ImGui::Text("Name");
-					ImGui::SameLine(ImGui::GetWindowWidth() * 0.2f);
-					ImGui::InputText("##Name", tmpBuffer, 149);
-					group.setName(tmpBuffer);
-				ImGui::PopItemWidth();
-
-				// Key binding of group
-				bool isKeyEditing = false;
-				ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.5f);
-					ImGui::AlignTextToFramePadding();
-					ImGui::Text("Key shortcut");
-					ImGui::SameLine(ImGui::GetWindowWidth() * 0.2f);
-					string textBoxContents = (g_toggleGroupIdKeyBindingEditing == group.getId()) ? g_keyCollector.getKeyAsString() : group.getToggleKeyAsString();	// The 'press a key' is inside keycollector
-					string toggleKeyName = group.getToggleKeyAsString();
-					ImGui::InputText("##Key shortcut", (char*)textBoxContents.c_str(), textBoxContents.size(), ImGuiInputTextFlags_ReadOnly);
-					if(ImGui::IsItemClicked())
-					{
-						startKeyBindingEditing(group);
-					}
-					if(g_toggleGroupIdKeyBindingEditing==group.getId())
-					{
-						isKeyEditing = true;
-						ImGui::SameLine();
-						if (ImGui::Button("OK"))
-						{
-							endKeyBindingEditing(true, group);
-						}
-						ImGui::SameLine();
-						if (ImGui::Button("Cancel"))
-						{
-							endKeyBindingEditing(false, group);
-						}
-					}
-				ImGui::PopItemWidth();
-
-				if(!isKeyEditing)
-				{
-					if(ImGui::Button("OK"))
-					{
-						group.setEditing(false);
-						g_toggleGroupIdKeyBindingEditing = -1;
-						g_keyCollector.clear();
-					}
-				}
-				ImGui::Separator();
-			}
-					
-			ImGui::PopID();
-		}
-		if(toRemove.size()>0)
-		{
-			// switch off keybinding editing or shader editing, if in progress
-			g_toggleGroupIdKeyBindingEditing = -1;
-			g_keyCollector.clear();
-			g_toggleGroupIdShaderEditing = -1;
-			g_pixelShaderManager.stopHuntingMode();
-			g_vertexShaderManager.stopHuntingMode();
-		}
-		for(const auto& group : toRemove)
-		{
-			std::erase(g_toggleGroups, group);
-		}
-
-		ImGui::Separator();
-		if(g_toggleGroups.size()>0)
-		{
-			if(ImGui::Button("Save all Toggle Groups"))
-			{
-				saveShaderTogglerIniFile();
-			}
-		}
-	}
-}
-
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID)
 {
@@ -715,6 +972,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID)
 		{
 			return FALSE;
 		}
+		g_addonUIData.LoadShaderTogglerIniFile();
+		reshade::register_event<reshade::addon_event::init_resource>(onInitResource);
+		reshade::register_event<reshade::addon_event::destroy_resource>(onDestroyResource);
 		reshade::register_event<reshade::addon_event::init_pipeline>(onInitPipeline);
 		reshade::register_event<reshade::addon_event::init_command_list>(onInitCommandList);
 		reshade::register_event<reshade::addon_event::destroy_command_list>(onDestroyCommandList);
@@ -722,25 +982,42 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID)
 		reshade::register_event<reshade::addon_event::destroy_pipeline>(onDestroyPipeline);
 		reshade::register_event<reshade::addon_event::reshade_overlay>(onReshadeOverlay);
 		reshade::register_event<reshade::addon_event::reshade_present>(onReshadePresent);
+		reshade::register_event<reshade::addon_event::reshade_reloaded_effects>(onReshadeReloadedEffects);
+		reshade::register_event<reshade::addon_event::reshade_set_technique_state>(onReshadeSetTechniqueState);
 		reshade::register_event<reshade::addon_event::bind_pipeline>(onBindPipeline);
-		reshade::register_event<reshade::addon_event::draw>(onDraw);
-		reshade::register_event<reshade::addon_event::draw_indexed>(onDrawIndexed);
-		reshade::register_event<reshade::addon_event::draw_or_dispatch_indirect>(onDrawOrDispatchIndirect);
+		reshade::register_event<reshade::addon_event::init_device>(onInitDevice);
+		reshade::register_event<reshade::addon_event::destroy_device>(onDestroyDevice);
+		reshade::register_event<reshade::addon_event::present>(onPresent);
+		reshade::register_event<reshade::addon_event::bind_render_targets_and_depth_stencil>(onBindRenderTargetsAndDepthStencil);
+		reshade::register_event<reshade::addon_event::init_effect_runtime>(onInitEffectRuntime);
+		reshade::register_event<reshade::addon_event::destroy_effect_runtime>(onDestroyEffectRuntime);
+		reshade::register_event<reshade::addon_event::reshade_begin_effects>(onReshadeBeginEffects);
+		reshade::register_event<reshade::addon_event::reshade_finish_effects>(onReshadeFinishEffects);
+		reshade::register_event<reshade::addon_event::push_descriptors>(onPushDescriptors);
 		reshade::register_overlay(nullptr, &displaySettings);
-		loadShaderTogglerIniFile();
 		break;
 	case DLL_PROCESS_DETACH:
 		reshade::unregister_event<reshade::addon_event::reshade_present>(onReshadePresent);
 		reshade::unregister_event<reshade::addon_event::destroy_pipeline>(onDestroyPipeline);
 		reshade::unregister_event<reshade::addon_event::init_pipeline>(onInitPipeline);
 		reshade::unregister_event<reshade::addon_event::reshade_overlay>(onReshadeOverlay);
+		reshade::unregister_event<reshade::addon_event::reshade_reloaded_effects>(onReshadeReloadedEffects);
+		reshade::unregister_event<reshade::addon_event::reshade_set_technique_state>(onReshadeSetTechniqueState);
 		reshade::unregister_event<reshade::addon_event::bind_pipeline>(onBindPipeline);
-		reshade::unregister_event<reshade::addon_event::draw>(onDraw);
-		reshade::unregister_event<reshade::addon_event::draw_indexed>(onDrawIndexed);
-		reshade::unregister_event<reshade::addon_event::draw_or_dispatch_indirect>(onDrawOrDispatchIndirect);
 		reshade::unregister_event<reshade::addon_event::init_command_list>(onInitCommandList);
 		reshade::unregister_event<reshade::addon_event::destroy_command_list>(onDestroyCommandList);
 		reshade::unregister_event<reshade::addon_event::reset_command_list>(onResetCommandList);
+		reshade::unregister_event<reshade::addon_event::init_device>(onInitDevice);
+		reshade::unregister_event<reshade::addon_event::destroy_device>(onDestroyDevice);
+		reshade::unregister_event<reshade::addon_event::present>(onPresent);
+		reshade::unregister_event<reshade::addon_event::bind_render_targets_and_depth_stencil>(onBindRenderTargetsAndDepthStencil);
+		reshade::unregister_event<reshade::addon_event::init_effect_runtime>(onInitEffectRuntime);
+		reshade::unregister_event<reshade::addon_event::destroy_effect_runtime>(onDestroyEffectRuntime);
+		reshade::unregister_event<reshade::addon_event::reshade_begin_effects>(onReshadeBeginEffects);
+		reshade::unregister_event<reshade::addon_event::reshade_finish_effects>(onReshadeFinishEffects);
+		reshade::unregister_event<reshade::addon_event::push_descriptors>(onPushDescriptors);
+		reshade::unregister_event<reshade::addon_event::init_resource>(onInitResource);
+		reshade::unregister_event<reshade::addon_event::destroy_resource>(onDestroyResource);
 		reshade::unregister_overlay(nullptr, &displaySettings);
 		reshade::unregister_addon(hModule);
 		break;

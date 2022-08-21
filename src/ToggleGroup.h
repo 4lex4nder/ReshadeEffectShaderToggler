@@ -33,6 +33,7 @@
 
 #include <string>
 #include <unordered_set>
+#include <unordered_map>
 
 #include "CDataFile.h"
 #include "KeyData.h"
@@ -43,6 +44,7 @@ namespace ShaderToggler
 	{
 	public:
 		ToggleGroup(std::string name, int Id);
+		ToggleGroup();
 
 		static int getNewGroupId();
 
@@ -76,9 +78,24 @@ namespace ShaderToggler
 		bool isEditing() { return _isEditing;}
 		bool isEmpty() const { return _vertexShaderHashes.size() <=0 && _pixelShaderHashes.size() <=0;}
 		int getId() const { return _id; }
+		std::unordered_set<std::string > preferredTechniques() const { return _preferredTechniques; }
+		void setPreferredTechniques(std::unordered_set<std::string> techniques) { _preferredTechniques = techniques; }
 		std::unordered_set<uint32_t> getPixelShaderHashes() const { return _pixelShaderHashes;}
 		std::unordered_set<uint32_t> getVertexShaderHashes() const { return _vertexShaderHashes;}
 		bool isToggleKeyPressed(const reshade::api::effect_runtime* runtime) { return _keyData.isKeyPressed(runtime);}
+		void setHistoryIndex(int32_t index) { _historyIndex = index; }
+		int32_t getHistoryIndex() const { return _historyIndex; }
+		bool isProvidingTextureBinding() const { return _isProvidingTextureBinding; }
+		void setProvidingTextureBinding(bool isProvidingTextureBinding) { _isProvidingTextureBinding = isProvidingTextureBinding; }
+		std::string getTextureBindingName() const { return _textureBindingName; }
+		void setTextureBindingName(std::string textureBindingName) { _textureBindingName = textureBindingName; }
+		bool getAllowAllTechniques() const { return _allowAllTechniques; }
+		void setAllowAllTechniques(bool allowAllTechniques) { _allowAllTechniques = allowAllTechniques; }
+		bool getExtractConstants() const { return _extractConstants; }
+		void setExtractConstant(bool extract) { _extractConstants = extract; }
+		const std::unordered_map<string, uintptr_t>& GetVarOffsetMapping() const { return _varOffsetMapping; }
+		bool SetVarMapping(uintptr_t, string&);
+		bool RemoveVarMapping(string&);
 		
 		bool operator==(const ToggleGroup& rhs)
 		{
@@ -91,7 +108,14 @@ namespace ShaderToggler
 		KeyData _keyData;
 		std::unordered_set<uint32_t> _vertexShaderHashes;
 		std::unordered_set<uint32_t> _pixelShaderHashes;
-		bool _isActive;			// true means the group is actively toggled (so the hashes have to be hidden.
-		bool _isEditing;		// true means the group is actively edited (name, key)
+		int32_t _historyIndex;
+		bool _isActive;				// true means the group is actively toggled (so the hashes have to be hidden.
+		bool _isEditing;			// true means the group is actively edited (name, key)
+		bool _allowAllTechniques;	// true means all techniques are allowed, regardless of preferred techniques.
+		bool _isProvidingTextureBinding;
+		bool _extractConstants;
+		std::string _textureBindingName;
+		std::unordered_set<std::string> _preferredTechniques;
+		std::unordered_map<string, uintptr_t> _varOffsetMapping;
 	};
 }

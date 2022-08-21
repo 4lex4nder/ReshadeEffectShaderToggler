@@ -24,6 +24,7 @@
     <ProjectGuid>{0de84e87-dc72-40a6-a1fd-d01e49659b21}</ProjectGuid>
     <RootNamespace>ShaderToggler</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>ReshadeEffectShaderToggler</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -137,7 +138,8 @@
       <EnableUAC>false</EnableUAC>
     </Link>
     <PostBuildEvent>
-      <Command>copy /y $(TargetPath) "C:\Users\frans.SD\Documents\Unreal Projects\ShooterGame426\Shipping426\WindowsNoEditor\ShooterGame426\Binaries\Win64"</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -161,8 +163,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AddonUIConstants.h" />
+    <ClInclude Include="AddonUIData.h" />
+    <ClInclude Include="AddonUIDisplay.h" />
     <ClInclude Include="CDataFile.h" />
+    <ClInclude Include="ConstantHandler.h" />
     <ClInclude Include="crc32_hash.hpp" />
+    <ClInclude Include="Include\ExternalVariablesPipe.h" />
     <ClInclude Include="KeyData.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="ShaderManager.h" />
@@ -170,7 +177,10 @@
     <ClInclude Include="ToggleGroup.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AddonUIData.cpp" />
     <ClCompile Include="CDataFile.cpp" />
+    <ClCompile Include="ConstantHandler.cpp" />
+    <ClCompile Include="ExternalVariablesPipe.cpp" />
     <ClCompile Include="KeyData.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="ShaderManager.cpp" />
