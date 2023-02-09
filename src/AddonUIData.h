@@ -32,15 +32,15 @@
 #pragma once
 
 #include <unordered_map>
+#include <filesystem>
 #include <reshade.hpp>
 #include "ShaderManager.h"
 #include "CDataFile.h"
 #include "ToggleGroup.h"
 #include "ConstantHandler.h"
 
-#define FRAMECOUNT_COLLECTION_PHASE_DEFAULT 10;
-#define HASH_FILE_NAME	"ReshadeEffectShaderToggler.ini"
-#define GET_VARIABLE_NAME(Variable) (#Variable)
+constexpr auto FRAMECOUNT_COLLECTION_PHASE_DEFAULT = 10;
+constexpr auto HASH_FILE_NAME = "ReshadeEffectShaderToggler.ini";
 
 using namespace reshade::api;
 using namespace ShaderToggler;
@@ -98,6 +98,7 @@ namespace AddonImGui
         uint32_t _keyBindings[ARRAYSIZE(KeybindNames)];
         bool _memcpyHookAttempt = false;
         bool _memcpyAssumeUnnested = false;
+        std::filesystem::path _basePath;
     public:
         AddonUIData(ShaderManager* pixelShaderManager, ShaderManager* vertexShaderManager, ConstantHandlerBase* constants, atomic_uint32_t* activeCollectorFrameCounter,
             vector<string>* techniques, unordered_map<string, tuple<constant_type, vector<effect_uniform_variable>>>*);
@@ -111,8 +112,10 @@ namespace AddonImGui
         void StartConstantEditing(ToggleGroup& groupEditing);
         void EndConstantEditing();
         void StopHuntingMode();
-        void SaveShaderTogglerIniFile();
-        void LoadShaderTogglerIniFile();
+        void SetBasePath(const std::filesystem::path& basePath) { _basePath = basePath; };
+        std::filesystem::path GetBasePath() { return _basePath; };
+        void SaveShaderTogglerIniFile(const std::string& fileName = HASH_FILE_NAME);
+        void LoadShaderTogglerIniFile(const std::string& fileName = HASH_FILE_NAME);
         void ResetKeyBinding(ToggleGroup& groupgroupEditing);
         atomic_int& GetToggleGroupIdShaderEditing() { return _toggleGroupIdShaderEditing; }
         atomic_int& GetToggleGroupIdEffectEditing() { return _toggleGroupIdEffectEditing; }
@@ -128,7 +131,7 @@ namespace AddonImGui
         ConstantHandlerBase* GetConstantHandler() { return _constantHandler; }
         uint32_t GetKeybinding(Keybind keybind);
         bool GetAttemptMemcpyHook() { return _memcpyHookAttempt; }
-        bool GetMemcpyAssumeUnnested()  { return _memcpyAssumeUnnested; }
+        bool GetMemcpyAssumeUnnested() { return _memcpyAssumeUnnested; }
         void SetKeybinding(Keybind keybind, uint32_t keys);
         const unordered_map<string, tuple<constant_type, vector<effect_uniform_variable>>>* GetRESTVariables() { return _constants; };
         reshade::api::format cFormat;

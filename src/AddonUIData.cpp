@@ -30,6 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /////////////////////////////////////////////////////////////////////////
 
+#include <format>
 #include "AddonUIData.h"
 
 using namespace AddonImGui;
@@ -94,13 +95,16 @@ void AddonUIData::AddDefaultGroup()
 /// <summary>
 /// Loads the defined hashes and groups from the shaderToggler.ini file.
 /// </summary>
-void AddonUIData::LoadShaderTogglerIniFile()
+void AddonUIData::LoadShaderTogglerIniFile(const std::string& fileName)
 {
     // Will assume it's started at the start of the application and therefore no groups are present.
 
+    reshade::log_message(3, std::format("Loading config file from \"{}\"", (_basePath / fileName).string()).c_str());
+
     CDataFile iniFile;
-    if (!iniFile.Load(HASH_FILE_NAME))
+    if (!iniFile.Load((_basePath / fileName).string()))
     {
+        reshade::log_message(3, std::format("Could not find config file at \"{}\"", (_basePath / fileName).string()).c_str());
         // not there
         return;
     }
@@ -144,7 +148,7 @@ void AddonUIData::LoadShaderTogglerIniFile()
 /// <summary>
 /// Saves the currently known toggle groups with their shader hashes to the shadertoggler.ini file
 /// </summary>
-void AddonUIData::SaveShaderTogglerIniFile()
+void AddonUIData::SaveShaderTogglerIniFile(const std::string& fileName)
 {
     // format: first section with # of groups, then per group a section with pixel and vertex shaders, as well as their name and key value.
     // groups are stored with "Group" + group counter, starting with 0.
@@ -166,7 +170,9 @@ void AddonUIData::SaveShaderTogglerIniFile()
         group.second.saveState(iniFile, groupCounter);
         groupCounter++;
     }
-    iniFile.SetFileName(HASH_FILE_NAME);
+    reshade::log_message(3, std::format("Creating config file at \"{}\"", (_basePath / fileName).string()).c_str());
+
+    iniFile.SetFileName((_basePath / fileName).string());
     iniFile.Save();
 }
 
