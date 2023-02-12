@@ -37,7 +37,7 @@
 #include "ShaderManager.h"
 #include "CDataFile.h"
 #include "ToggleGroup.h"
-#include "ConstantHandler.h"
+#include "ConstantHandlerBase.h"
 
 constexpr auto FRAMECOUNT_COLLECTION_PHASE_DEFAULT = 10;
 constexpr auto HASH_FILE_NAME = "ReshadeEffectShaderToggler.ini";
@@ -87,22 +87,26 @@ namespace AddonImGui
         ConstantHandlerBase* _constantHandler;
         atomic_uint32_t* _activeCollectorFrameCounter;
         vector<string>* _allTechniques;
-        unordered_map<string, tuple<constant_type, vector<effect_uniform_variable>>>* _constants;
         atomic_int _historyIndexSelection = 0;
         atomic_int _toggleGroupIdShaderEditing = -1;
         atomic_int _toggleGroupIdEffectEditing = -1;
         atomic_int _toggleGroupIdConstantEditing = -1;
         std::unordered_map<int, ToggleGroup> _toggleGroups;
+        std::unordered_map<uint32_t, vector<ToggleGroup*>> _pixelShaderHashToToggleGroups;
+        std::unordered_map<uint32_t, vector<ToggleGroup*>> _vertexShaderHashToToggleGroups;
         int _startValueFramecountCollectionPhase = FRAMECOUNT_COLLECTION_PHASE_DEFAULT;
         float _overlayOpacity = 0.2f;
         uint32_t _keyBindings[ARRAYSIZE(KeybindNames)];
-        bool _memcpyHookAttempt = false;
-        bool _memcpyAssumeUnnested = false;
+        string _constHookType = "none";
+        string _constHookCopyType = "singular";
         std::filesystem::path _basePath;
     public:
         AddonUIData(ShaderManager* pixelShaderManager, ShaderManager* vertexShaderManager, ConstantHandlerBase* constants, atomic_uint32_t* activeCollectorFrameCounter,
-            vector<string>* techniques, unordered_map<string, tuple<constant_type, vector<effect_uniform_variable>>>*);
+            vector<string>* techniques);
         std::unordered_map<int, ToggleGroup>& GetToggleGroups();
+        const std::vector<ToggleGroup*>* GetToggleGroupsForPixelShaderHash(uint32_t hash);
+        const std::vector<ToggleGroup*>* GetToggleGroupsForVertexShaderHash(uint32_t hash);
+        void UpdateToggleGroupsForShaderHashes();
         void AddDefaultGroup();
         const atomic_int& GetToggleGroupIdShaderEditing() const;
         void EndShaderEditing(bool acceptCollectedShaderHashes, ToggleGroup& groupEditing);
@@ -130,10 +134,10 @@ namespace AddonImGui
         void SetConstantHandler(ConstantHandlerBase* handler) { _constantHandler = handler; }
         ConstantHandlerBase* GetConstantHandler() { return _constantHandler; }
         uint32_t GetKeybinding(Keybind keybind);
-        bool GetAttemptMemcpyHook() { return _memcpyHookAttempt; }
-        bool GetMemcpyAssumeUnnested() { return _memcpyAssumeUnnested; }
+        const string& GetConstHookType() { return _constHookType; }
+        const string& GetConstHookCopyType()  { return _constHookCopyType; }
         void SetKeybinding(Keybind keybind, uint32_t keys);
-        const unordered_map<string, tuple<constant_type, vector<effect_uniform_variable>>>* GetRESTVariables() { return _constants; };
+        const unordered_map<string, tuple<constant_type, vector<effect_uniform_variable>>>* GetRESTVariables() { return _constantHandler->GetRESTVariables(); };
         reshade::api::format cFormat;
     };
 }

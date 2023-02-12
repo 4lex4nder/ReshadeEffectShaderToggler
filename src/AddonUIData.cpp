@@ -36,9 +36,9 @@
 using namespace AddonImGui;
 
 AddonUIData::AddonUIData(ShaderManager* pixelShaderManager, ShaderManager* vertexShaderManager, ConstantHandlerBase* cHandler, atomic_uint32_t* activeCollectorFrameCounter,
-    vector<string>* techniques, unordered_map<string, tuple<constant_type, vector<effect_uniform_variable>>>* constants) :
+    vector<string>* techniques):
     _pixelShaderManager(pixelShaderManager), _vertexShaderManager(vertexShaderManager), _activeCollectorFrameCounter(activeCollectorFrameCounter),
-    _allTechniques(techniques), _constantHandler(cHandler), _constants(constants)
+    _allTechniques(techniques), _constantHandler(cHandler)
 {
     _toggleGroupIdShaderEditing = -1;
     _overlayOpacity = 0.2f;
@@ -61,6 +61,50 @@ AddonUIData::AddonUIData(ShaderManager* pixelShaderManager, ShaderManager* verte
 std::unordered_map<int, ToggleGroup>& AddonUIData::GetToggleGroups()
 {
     return _toggleGroups;
+}
+
+
+const std::vector<ToggleGroup*>* AddonUIData::GetToggleGroupsForPixelShaderHash(uint32_t hash)
+{
+    const auto& it = _pixelShaderHashToToggleGroups.find(hash);
+
+    if (it != _pixelShaderHashToToggleGroups.end())
+    {
+        return &it->second;
+    }
+
+    return nullptr;
+}
+
+const std::vector<ToggleGroup*>* AddonUIData::GetToggleGroupsForVertexShaderHash(uint32_t hash)
+{
+    const auto& it = _vertexShaderHashToToggleGroups.find(hash);
+
+    if (it != _vertexShaderHashToToggleGroups.end())
+    {
+        return &it->second;
+    }
+
+    return nullptr;
+}
+
+void AddonUIData::UpdateToggleGroupsForShaderHashes()
+{
+    _pixelShaderHashToToggleGroups.clear();
+    _vertexShaderHashToToggleGroups.clear();
+
+    for (auto& group : _toggleGroups)
+    {
+        for (const auto& h : group.second.getPixelShaderHashes())
+        {
+            _pixelShaderHashToToggleGroups[h].push_back(&group.second);
+        }
+
+        for (const auto& h : group.second.getVertexShaderHashes())
+        {
+            _vertexShaderHashToToggleGroups[h].push_back(&group.second);
+        }
+    }
 }
 
 const vector<string>* AddonUIData::GetAllTechniques() const
@@ -109,8 +153,17 @@ void AddonUIData::LoadShaderTogglerIniFile(const std::string& fileName)
         return;
     }
 
-    _memcpyHookAttempt = iniFile.GetBool("AttemptMemcpyHook", "General");
-    _memcpyAssumeUnnested = iniFile.GetBool("MemcpyAssumeUnnestedMap", "General");
+    _constHookType = iniFile.GetValue("ConstantBufferHookType", "General");
+    if (_constHookType.size() <= 0)
+    {
+        _constHookType = "none";
+    }
+
+    _constHookCopyType = iniFile.GetValue("ConstantBufferHookCopyType", "General");
+    if (_constHookCopyType.size() <= 0)
+    {
+        _constHookCopyType = "singular";
+    }
 
     for (uint32_t i = 0; i < ARRAYSIZE(KeybindNames); i++)
     {
@@ -141,6 +194,16 @@ void AddonUIData::LoadShaderTogglerIniFile(const std::string& fileName)
     {
         group.second.loadState(iniFile, groupCounter);		// groupCounter is normally 0 or greater. For when the old format is detected, it's -1 (and there's 1 group).
         groupCounter++;
+
+        for (const auto& h : group.second.getPixelShaderHashes())
+        {
+            _pixelShaderHashToToggleGroups[h].push_back(&group.second);
+        }
+
+        for (const auto& h : group.second.getVertexShaderHashes())
+        {
+            _vertexShaderHashToToggleGroups[h].push_back(&group.second);
+        }
     }
 }
 
@@ -154,8 +217,8 @@ void AddonUIData::SaveShaderTogglerIniFile(const std::string& fileName)
     // groups are stored with "Group" + group counter, starting with 0.
     CDataFile iniFile;
 
-    iniFile.SetBool("AttemptMemcpyHook", _memcpyHookAttempt, "", "General");
-    iniFile.SetBool("MemcpyAssumeUnnestedMap", _memcpyAssumeUnnested, "", "General");
+    iniFile.SetValue("ConstantBufferHookType", _constHookType, "", "General");
+    iniFile.SetValue("ConstantBufferHookCopyType", _constHookCopyType, "", "General");
 
     for (uint32_t i = 0; i < ARRAYSIZE(KeybindNames); i++)
     {
@@ -191,6 +254,8 @@ void AddonUIData::EndShaderEditing(bool acceptCollectedShaderHashes, ToggleGroup
         _vertexShaderManager->stopHuntingMode();
     }
     _toggleGroupIdShaderEditing = -1;
+
+    UpdateToggleGroupsForShaderHashes();
 }
 
 

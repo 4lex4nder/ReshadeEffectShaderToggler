@@ -32,7 +32,7 @@ static const unordered_set<string> varExclusionSet({
 
 static void DisplayConstantViewer(AddonImGui::AddonUIData& instance, ToggleGroup* group, device* dev, command_queue* queue)
 {
-    if (group == nullptr)
+    if (group == nullptr || instance.GetConstantHandler() == nullptr)
     {
         return;
     }
@@ -158,15 +158,15 @@ static void DisplayConstantViewer(AddonImGui::AddonUIData& instance, ToggleGroup
         {
             if (ImGui::Button("Add Variable Binding"))
             {
-                ImGui::OpenPopup("Add");
+                ImGui::OpenPopup("Add###const_variables");
             }
 
             ImGui::Separator();
-
-            if (ImGui::BeginPopupModal("Add", nullptr, ImGuiWindowFlags_AlwaysAutoResize) && instance.GetRESTVariables()->size() > 0)
+            
+            if (ImGui::BeginPopupModal("Add###const_variables", nullptr, ImGuiWindowFlags_AlwaysAutoResize) && instance.GetRESTVariables()->size() > 0)
             {
                 ImGui::Text("Add constant buffer offset to variable binding:");
-
+            
                 static int varSelectionIndex = 0;
                 vector<string> varNames;
                 std::transform(instance.GetRESTVariables()->begin(), instance.GetRESTVariables()->end(), std::back_inserter(varNames),
@@ -176,9 +176,9 @@ static void DisplayConstantViewer(AddonImGui::AddonUIData& instance, ToggleGroup
                     });
                 vector<string> filteredVars;
                 std::copy_if(varNames.begin(), varNames.end(), std::back_inserter(filteredVars), [](const string& s) { return !varExclusionSet.contains(s); });
-
+            
                 static string varSelectedItem = filteredVars.size() > 0 ? filteredVars[0] : "";
-
+            
                 if (ImGui::BeginCombo("Variable", varSelectedItem.c_str(), ImGuiComboFlags_None))
                 {
                     for (auto& v : filteredVars)
@@ -193,17 +193,17 @@ static void DisplayConstantViewer(AddonImGui::AddonUIData& instance, ToggleGroup
                     }
                     ImGui::EndCombo();
                 }
-
+            
                 ImGui::Text("0x");
                 ImGui::SameLine();
                 ImGui::InputText("Offset", offsetInputBuf, offsetInputBufSize, ImGuiInputTextFlags_CharsHexadecimal);
-
+            
                 static bool prevValue = false;
-
+            
                 ImGui::Checkbox("Use previous value", &prevValue);
-
+            
                 ImGui::Separator();
-
+            
                 ImGui::SetCursorPosX(ImGui::GetWindowWidth() / 2 - 120 - ImGui::GetStyle().ItemSpacing.x / 2 - ImGui::GetStyle().FramePadding.x / 2);
                 if (ImGui::Button("OK", ImVec2(120, 0)))
                 {
@@ -219,7 +219,7 @@ static void DisplayConstantViewer(AddonImGui::AddonUIData& instance, ToggleGroup
                 {
                     ImGui::CloseCurrentPopup();
                 }
-
+            
                 ImGui::EndPopup();
             }
 

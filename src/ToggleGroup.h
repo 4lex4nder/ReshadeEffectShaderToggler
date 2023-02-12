@@ -47,8 +47,6 @@ namespace ShaderToggler
 
         static int getNewGroupId();
 
-        //void setToggleKey(uint8_t newKeyValue, bool shiftRequired, bool altRequired, bool ctrlRequired);
-        //void setToggleKey(KeyData newData);
         void setToggleKey(uint32_t keybind) { _keybind = keybind; }
         void setName(std::string newName);
         /// <summary>
@@ -64,8 +62,8 @@ namespace ShaderToggler
         /// <param name="groupCounter">if -1, the ini file is in the pre-1.0 format</param>
         void loadState(CDataFile& iniFile, int groupCounter);
         void storeCollectedHashes(const std::unordered_set<uint32_t> pixelShaderHashes, const std::unordered_set<uint32_t> vertexShaderHashes);
-        bool isBlockedVertexShader(uint32_t shaderHash);
-        bool isBlockedPixelShader(uint32_t shaderHash);
+        bool isBlockedVertexShader(uint32_t shaderHash) const;
+        bool isBlockedPixelShader(uint32_t shaderHash) const;
         void clearHashes();
 
         void toggleActive() { _isActive = !_isActive; }
@@ -73,11 +71,11 @@ namespace ShaderToggler
 
         uint32_t getToggleKey() { return _keybind; }
         std::string getName() { return _name; }
-        bool isActive() { return _isActive; }
+        bool isActive() const { return _isActive; }
         bool isEditing() { return _isEditing; }
         bool isEmpty() const { return _vertexShaderHashes.size() <= 0 && _pixelShaderHashes.size() <= 0; }
         int getId() const { return _id; }
-        std::unordered_set<std::string > preferredTechniques() const { return _preferredTechniques; }
+        const std::unordered_set<std::string>& preferredTechniques() const { return _preferredTechniques; }
         void setPreferredTechniques(std::unordered_set<std::string> techniques) { _preferredTechniques = techniques; }
         std::unordered_set<uint32_t> getPixelShaderHashes() const { return _pixelShaderHashes; }
         std::unordered_set<uint32_t> getVertexShaderHashes() const { return _vertexShaderHashes; }
@@ -85,7 +83,7 @@ namespace ShaderToggler
         int32_t getHistoryIndex() const { return _historyIndex; }
         bool isProvidingTextureBinding() const { return _isProvidingTextureBinding; }
         void setProvidingTextureBinding(bool isProvidingTextureBinding) { _isProvidingTextureBinding = isProvidingTextureBinding; }
-        std::string getTextureBindingName() const { return _textureBindingName; }
+        const std::string& getTextureBindingName() const { return _textureBindingName; }
         void setTextureBindingName(std::string textureBindingName) { _textureBindingName = textureBindingName; }
         bool getAllowAllTechniques() const { return _allowAllTechniques; }
         void setAllowAllTechniques(bool allowAllTechniques) { _allowAllTechniques = allowAllTechniques; }

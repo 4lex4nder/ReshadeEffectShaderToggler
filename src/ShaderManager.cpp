@@ -55,10 +55,10 @@ namespace ShaderToggler
     void ShaderManager::removeHandle(uint64_t handle)
     {
         std::unique_lock ulock(_hashHandlesMutex);
-        if (_handleToShaderHash.count(handle) == 1)
+        if (_handleToShaderHash.contains(handle))
         {
-            const auto it = _handleToShaderHash.find(handle);
-            const auto shaderHash = it->second;
+            const auto& it = _handleToShaderHash.find(handle);
+            const auto& shaderHash = it->second;
             _handleToShaderHash.erase(handle);
             _collectedActiveShaderHashes.erase(shaderHash);
             _shaderHashes.erase(shaderHash);
@@ -128,7 +128,7 @@ namespace ShaderToggler
         }
         if (ctrlPressed)
         {
-            if (_markedShaderHashes.size() == 0 || (_markedShaderHashes.size() == 1 && _markedShaderHashes.count(_activeHuntedShaderHash) == 1))
+            if (_markedShaderHashes.size() == 0 || (_markedShaderHashes.size() == 1 && _markedShaderHashes.contains(_activeHuntedShaderHash)))
             {
                 // optimization: if the current active shader is part of marked shader hashes and there is
                 // just 1 marked, then we can also stop. We then don't need to do anything so we can return
@@ -150,7 +150,7 @@ namespace ShaderToggler
                     index = 0;
                 }
                 hash = *it;
-                if (_markedShaderHashes.count(hash) == 1)
+                if (_markedShaderHashes.contains(hash))
                 {
                     // found one
                     foundHash = true;
@@ -191,7 +191,7 @@ namespace ShaderToggler
         }
         if (ctrlPressed)
         {
-            if (_markedShaderHashes.size() == 0 || (_markedShaderHashes.size() == 1 && _markedShaderHashes.count(_activeHuntedShaderHash) == 1))
+            if (_markedShaderHashes.size() == 0 || (_markedShaderHashes.size() == 1 && _markedShaderHashes.contains(_activeHuntedShaderHash)))
             {
                 // optimization: if the current active shader is part of marked shader hashes and there is
                 // just 1 marked, then we can also stop. We then don't need to do anything so we can return
@@ -213,7 +213,7 @@ namespace ShaderToggler
                     index = _collectedActiveShaderHashes.size() - 1;
                 }
                 hash = *it;
-                if (_markedShaderHashes.count(hash) == 1)
+                if (_markedShaderHashes.contains(hash))
                 {
                     // found one
                     foundHash = true;
@@ -254,7 +254,7 @@ namespace ShaderToggler
         if (_hideMarkedShaders)
         {
             // check if the shader hash is part of the toggle group
-            toReturn |= _markedShaderHashes.count(shaderHash) == 1;
+            toReturn |= _markedShaderHashes.contains(shaderHash);
         }
 
         return toReturn;
@@ -280,7 +280,7 @@ namespace ShaderToggler
             return;
         }
         std::unique_lock lock(_markedShaderHashMutex);
-        if (_markedShaderHashes.count(_activeHuntedShaderHash) == 1)
+        if (_markedShaderHashes.contains(_activeHuntedShaderHash))
         {
             // remove it
             _markedShaderHashes.erase(_activeHuntedShaderHash);
@@ -295,7 +295,7 @@ namespace ShaderToggler
 
     uint32_t ShaderManager::getShaderHash(uint64_t handle)
     {
-        if (_handleToShaderHash.count(handle) != 1)
+        if (!_handleToShaderHash.contains(handle))
         {
             return 0;
         }

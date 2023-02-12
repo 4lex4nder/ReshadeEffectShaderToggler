@@ -172,71 +172,6 @@ static void DisplayTechniqueSelection(AddonImGui::AddonUIData& instance, ToggleG
     }
 }
 
-
-//static void DisplayShaderSelection(AddonImGui::AddonUIData& instance, effect_runtime* runtime, ToggleGroup* group)
-//{
-//	if (*instance.ActiveCollectorFrameCounter() > 0)
-//	{
-//		const uint32_t counterValue = *instance.ActiveCollectorFrameCounter();
-//		ImGui::Text("Collecting active shaders... frames to go: %d", counterValue);
-//	}
-//	else
-//	{
-//		float height = ImGui::GetWindowHeight();
-//
-//		ShaderManager* shaderManagers[] = { instance.GetPixelShaderManager(), instance.GetVertexShaderManager() };
-//		const char* shaderManagerIds[] = { "Pixel Shader", "Vertex Shader" };
-//
-//		for (uint32_t i = 0; i < IM_ARRAYSIZE(shaderManagers); i++)
-//		{
-//			if(!shaderManagers[i]->isInHuntingMode())
-//			{
-//				continue;
-//			}
-//
-//			ImGui::SameLine();
-//
-//			if (!ImGui::BeginTable(std::format("{}##table", shaderManagerIds[i]).c_str(), 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
-//			{
-//				ImGui::EndTable();
-//				continue;
-//			}
-//
-//			vector<uint32_t> pShader = shaderManagers[i]->getHuntedShaders();
-//			bool noneSelected = true;
-//			for (int i = 0; i < pShader.size(); i++)
-//			{
-//				ImGui::TableNextColumn();
-//				ImGui::TableHeader(std::format("{:#02d}", i).c_str());
-//
-//				bool enabled = shaderManagers[i]->isMarkedShader(pShader[i]);
-//				ImGui::TableNextColumn();
-//				ImGui::Checkbox(std::format("{}", pShader[i]).c_str(), &enabled);
-//				if (ImGui::IsItemHovered())
-//				{
-//					noneSelected = false;
-//					shaderManagers[i]->setActiveHuntedShader(pShader[i]);
-//				}
-//
-//				if (enabled)
-//					shaderManagers[i]->markHuntedShader(pShader[i]);
-//				else
-//					shaderManagers[i]->unmarkHuntedShader(pShader[i]);
-//			}
-//
-//			if (noneSelected)
-//			{
-//				shaderManagers[i]->setActiveHuntedShader(0);
-//			}
-//
-//			ImGui::EndTable();
-//		}
-//
-//		ImGui::EndChild();
-//	}
-//}
-
-
 static void DisplayOverlay(AddonImGui::AddonUIData& instance, effect_runtime* runtime)
 {
     if (instance.GetToggleGroupIdConstantEditing() >= 0)
@@ -330,6 +265,11 @@ static void CheckHotkeys(AddonImGui::AddonUIData& instance, effect_runtime* runt
     if (*instance.ActiveCollectorFrameCounter() > 0)
     {
         --(*instance.ActiveCollectorFrameCounter());
+    }
+
+    if (instance.GetToggleGroupIdShaderEditing() == -1)
+    {
+        return;
     }
 
     ToggleGroup* editGroup = nullptr;

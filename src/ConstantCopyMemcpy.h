@@ -4,17 +4,17 @@
 #include <reshade_api_device.hpp>
 #include <reshade_api_pipeline.hpp>
 #include <unordered_map>
+#include <vector>
 #include <shared_mutex>
 #include <sigmatch.hpp>
+#include "ConstantCopyDefinitions.h"
 #include "ToggleGroup.h"
-#include "ConstantHandlerBase.h"
+#include "ConstantCopyBase.h"
 
 using namespace std;
 using namespace reshade::api;
 using namespace ShaderToggler;
 using namespace sigmatch_literals;
-
-using sig_memcpy = void* (__fastcall)(void*, void*, size_t);
 
 #if _WIN64
 static const vector<sigmatch::signature> memcpy_static = {
@@ -49,40 +49,22 @@ static const vector<tuple<wstring, string>> memcpy_dynamic = {
 };
 
 namespace ConstantFeedback {
-    class ConstantHandlerMemcpy : public virtual ConstantHandlerBase {
+    class ConstantCopyMemcpy : public virtual ConstantCopyBase {
     public:
-        ConstantHandlerMemcpy();
-        ~ConstantHandlerMemcpy();
+        ConstantCopyMemcpy();
+        ~ConstantCopyMemcpy();
 
-        void SetBufferRange(const ToggleGroup* group, buffer_range range, device* dev, command_list* cmd_list, command_queue* queue);
-        void RemoveGroup(const ToggleGroup*, device* dev, command_queue* queue);
-
-        const uint8_t* GetHostConstantBuffer(uint64_t resourceHandle);
-        void CreateHostConstantBuffer(device* dev, resource resource);
-        void DeleteHostConstantBuffer(resource resource);
-        void SetHostConstantBuffer(const uint64_t handle, const void* buffer, size_t size, uint64_t offset, uint64_t bufferSize);
+        bool Init();
+        bool UnInit();
 
         bool Hook(sig_memcpy** original, sig_memcpy* detour);
         bool Unhook();
 
-        using ConstantHandlerBase::GetConstantBuffer;
-        using ConstantHandlerBase::GetConstantBufferSize;
-        using ConstantHandlerBase::ApplyConstantValues;
     private:
-        unordered_map<const ToggleGroup*, buffer_range> groupBufferRanges;
-
-        unordered_map<uint64_t, vector<uint8_t>> deviceToHostConstantBuffer;
-        shared_mutex deviceHostMutex;
-
-        bool CreateScratchpad(const ToggleGroup* group, device* dev, resource_desc& target);
-        void CopyToScratchpad(const ToggleGroup* group, device* dev, command_list* cmd_list, command_queue* queue);
-
-        template<typename T>
-        static T* InstallHook(void* target, T* callback);
-        template<typename T>
-        static T* InstallApiHook(LPCWSTR pszModule, LPCSTR pszProcName, T* callback);
         bool HookStatic(sig_memcpy** original, sig_memcpy* detour);
         bool HookDynamic(sig_memcpy** original, sig_memcpy* detour);
-        string GetExecutableName();
+
+        static sig_memcpy* org_memcpy;
+        static void* __fastcall detour_memcpy(void* dest, void* src, size_t size);
     };
 }

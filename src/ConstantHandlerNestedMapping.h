@@ -5,19 +5,18 @@
 #include <reshade_api_pipeline.hpp>
 #include <unordered_map>
 #include "ToggleGroup.h"
-#include "ConstantHandlerMemcpy.h"
-#include "ConstantCopyMethod.h"
+#include "ConstantHandlerBase.h"
 
 using namespace std;
 using namespace reshade::api;
 using namespace ShaderToggler;
 
 namespace ConstantFeedback {
-    class ConstantCopyMethodNestedMapping : public virtual ConstantCopyMethod
+    class ConstantHandlerNestedMapping : public virtual ConstantHandlerBase
     {
     public:
-        ConstantCopyMethodNestedMapping(ConstantHandlerMemcpy* constHandler);
-        ~ConstantCopyMethodNestedMapping();
+        ConstantHandlerNestedMapping();
+        ~ConstantHandlerNestedMapping();
 
         void OnMapBufferRegion(device* device, resource resource, uint64_t offset, uint64_t size, map_access access, void** data) override;
         void OnUnmapBufferRegion(device* device, resource resource) override;
