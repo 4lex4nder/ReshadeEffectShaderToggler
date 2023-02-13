@@ -564,6 +564,32 @@ static void DisplaySettings(AddonImGui::AddonUIData& instance, effect_runtime* r
                 group.setName(tmpBuffer);
                 ImGui::PopItemWidth();
 
+                // Name of Binding
+                bool isBindingEnabled = group.isProvidingTextureBinding();
+                const string& bindingName = group.getTextureBindingName();
+                strncpy_s(tmpBuffer, 150, bindingName.c_str(), bindingName.size());
+                ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.7f);
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Binding Name");
+                ImGui::SameLine(ImGui::GetWindowWidth() * 0.2f);
+                if (isBindingEnabled)
+                {
+                    ImGui::InputText("##BindingName", tmpBuffer, 149);
+                }
+                else
+                {
+                    ImGui::BeginDisabled();
+                    ImGui::InputText("##BindingName", tmpBuffer, 149);
+                    ImGui::EndDisabled();
+                }
+                ImGui::PopItemWidth();
+                
+                group.setTextureBindingName(tmpBuffer);
+
+                ImGui::SameLine(ImGui::GetWindowWidth() * 0.905f);
+                ImGui::Checkbox("##isBindingEnabled", &isBindingEnabled);
+                group.setProvidingTextureBinding(isBindingEnabled);
+                
                 // Key binding of group
                 ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.7f);
                 ImGui::AlignTextToFramePadding();
