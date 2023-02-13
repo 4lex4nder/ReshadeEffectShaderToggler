@@ -74,7 +74,6 @@ static ConstantManager constantManager;
 static ConstantHandlerBase* constantHandler = nullptr;
 static ConstantCopyBase* constantCopy = nullptr;
 static bool constantHandlerHooked = false;
-static bool reloadEffectVaribles = false;
 
 static atomic_uint32_t g_activeCollectorFrameCounter = 0;
 static vector<string> allTechniques;
@@ -504,7 +503,6 @@ static void onReshadeReloadedEffects(effect_runtime* runtime)
     DeviceDataContainer& data = runtime->get_device()->get_private_data<DeviceDataContainer>();
     data.allEnabledTechniques.clear();
     allTechniques.clear();
-    reloadEffectVaribles = true;
     
     enumerateTechniques(data.current_runtime, [&data](effect_runtime* runtime, effect_technique technique, string& name) {
         allTechniques.push_back(name);
@@ -520,7 +518,6 @@ static void onReshadeReloadedEffects(effect_runtime* runtime)
 
 static bool onReshadeSetTechniqueState(effect_runtime* runtime, effect_technique technique, bool enabled)
 {
-    reloadEffectVaribles = true;
     DeviceDataContainer& data = runtime->get_device()->get_private_data<DeviceDataContainer>();
     g_charBufferSize = CHAR_BUFFER_SIZE;
     runtime->get_technique_name(technique, g_charBuffer, &g_charBufferSize);
@@ -1359,14 +1356,12 @@ static void onReshadePresent(effect_runtime* runtime)
     
     deviceData.bindingsUpdated.clear();
     deviceData.constantsUpdated.clear();
-
-    //constantManager.Init(g_addonUIData, &constantCopy, &constantHandler);
     
-    if (reloadEffectVaribles)
+    if (constantHandler != nullptr)
     {
         constantHandler->ReloadConstantVariables(runtime);
-        reloadEffectVaribles = false;
     }
+
     CheckHotkeys(g_addonUIData, runtime);
     
     deviceData.groups = &g_addonUIData.GetToggleGroups();
