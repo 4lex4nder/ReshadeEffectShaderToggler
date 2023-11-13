@@ -16,20 +16,10 @@ RenderingShaderManager::~RenderingShaderManager()
 {
 }
 
-void RenderingShaderManager::InitShader(reshade::api::device* device, uint16_t ps_resource_id, uint16_t vs_resource_id, reshade::api::pipeline& sh_pipeline, reshade::api::pipeline_layout& sh_layout, reshade::api::sampler& sh_sampler)
+bool RenderingShaderManager::CreatePipeline(reshade::api::device* device, reshade::api::pipeline_layout layout, uint16_t ps_resource_id, uint16_t vs_resource_id, reshade::api::pipeline& sh_pipeline, uint8_t write_mask)
 {
     if (sh_pipeline == 0 && (device->get_api() == device_api::d3d9 || device->get_api() == device_api::d3d10 || device->get_api() == device_api::d3d11 || device->get_api() == device_api::d3d12))
     {
-        sampler_desc sampler_desc = {};
-        sampler_desc.filter = filter_mode::min_mag_mip_point;
-        sampler_desc.address_u = texture_address_mode::clamp;
-        sampler_desc.address_v = texture_address_mode::clamp;
-        sampler_desc.address_w = texture_address_mode::clamp;
-
-        pipeline_layout_param layout_params[2];
-        layout_params[0] = descriptor_range{ 0, 0, 0, 1, shader_stage::all, 1, descriptor_type::sampler };
-        layout_params[1] = descriptor_range{ 0, 0, 0, 1, shader_stage::all, 1, descriptor_type::shader_resource_view };
-
         const EmbeddedResourceData vs = resourceManager.GetResourceData(vs_resource_id);
         const EmbeddedResourceData ps = resourceManager.GetResourceData(ps_resource_id);
 
@@ -57,7 +47,7 @@ void RenderingShaderManager::InitShader(reshade::api::device* device, uint16_t p
         blend_state.source_alpha_blend_factor[0] = blend_factor::one;
         blend_state.dest_alpha_blend_factor[0] = blend_factor::one_minus_source_alpha;
         blend_state.alpha_blend_op[0] = blend_op::add;
-        blend_state.render_target_write_mask[0] = 0xF;
+        blend_state.render_target_write_mask[0] = write_mask;
 
         subobjects.push_back({ pipeline_subobject_type::blend_state, 1, &blend_state });
 
@@ -67,8 +57,36 @@ void RenderingShaderManager::InitShader(reshade::api::device* device, uint16_t p
 
         subobjects.push_back({ pipeline_subobject_type::rasterizer_state, 1, &rasterizer_state });
 
+        if (!device->create_pipeline(layout, static_cast<uint32_t>(subobjects.size()), subobjects.data(), &sh_pipeline))
+        {
+            sh_pipeline = {};
+            reshade::log_message(reshade::log_level::warning, "Unable to create pipeline");
+
+            return false;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+void RenderingShaderManager::InitShader(reshade::api::device* device, uint16_t ps_resource_id, uint16_t vs_resource_id, reshade::api::pipeline& sh_pipeline, reshade::api::pipeline_layout& sh_layout, reshade::api::sampler& sh_sampler)
+{
+    if (sh_pipeline == 0 && (device->get_api() == device_api::d3d9 || device->get_api() == device_api::d3d10 || device->get_api() == device_api::d3d11 || device->get_api() == device_api::d3d12))
+    {
+        sampler_desc sampler_desc = {};
+        sampler_desc.filter = filter_mode::min_mag_mip_point;
+        sampler_desc.address_u = texture_address_mode::clamp;
+        sampler_desc.address_v = texture_address_mode::clamp;
+        sampler_desc.address_w = texture_address_mode::clamp;
+
+        pipeline_layout_param layout_params[2];
+        layout_params[0] = descriptor_range{ 0, 0, 0, 1, shader_stage::all, 1, descriptor_type::sampler };
+        layout_params[1] = descriptor_range{ 0, 0, 0, 1, shader_stage::all, 1, descriptor_type::shader_resource_view };
+
         if (!device->create_pipeline_layout(2, layout_params, &sh_layout) ||
-            !device->create_pipeline(sh_layout, static_cast<uint32_t>(subobjects.size()), subobjects.data(), &sh_pipeline) ||
+            !CreatePipeline(device, sh_layout, ps_resource_id, vs_resource_id, sh_pipeline) ||
             !device->create_sampler(sampler_desc, &sh_sampler))
         {
             sh_pipeline = {};
@@ -111,16 +129,19 @@ void RenderingShaderManager::InitShaders(reshade::api::device* device)
     if (device->get_api() == device_api::d3d9)
     {
         InitShader(device, SHADER_PREVIEW_COPY_PS_3_0, SHADER_FULLSCREEN_VS_3_0, copyPipeline, copyPipelineLayout, copyPipelineSampler);
+        CreatePipeline(device, copyPipelineLayout, SHADER_PREVIEW_COPY_PS_3_0, SHADER_FULLSCREEN_VS_3_0, copyPipelineAlpha, 0x7);
     }
     else
     {
         InitShader(device, SHADER_PREVIEW_COPY_PS_4_0, SHADER_FULLSCREEN_VS_4_0, copyPipeline, copyPipelineLayout, copyPipelineSampler);
+        CreatePipeline(device, copyPipelineLayout, SHADER_PREVIEW_COPY_PS_4_0, SHADER_FULLSCREEN_VS_4_0, copyPipelineAlpha, 0x7);
     }
 }
 
 void RenderingShaderManager::DestroyShaders(reshade::api::device* device)
 {
     copyPipeline = {};
+    copyPipelineAlpha = {};
     copyPipelineLayout = {};
     copyPipelineSampler = {};
 }
@@ -171,5 +192,11 @@ void RenderingShaderManager::ApplyShader(command_list* cmd_list, resource_view s
 void RenderingShaderManager::CopyResource(command_list* cmd_list, resource_view srv_src, resource_view rtv_dst, uint32_t width, uint32_t height)
 {
     ApplyShader(cmd_list, srv_src, rtv_dst, copyPipeline, copyPipelineLayout, copyPipelineSampler, width, height);
+    cmd_list->get_private_data<state_tracking>().apply(cmd_list, true);
+}
+
+void RenderingShaderManager::CopyResourceMaskAlpha(reshade::api::command_list* cmd_list, reshade::api::resource_view srv_src, reshade::api::resource_view rtv_dst, uint32_t width, uint32_t height)
+{
+    ApplyShader(cmd_list, srv_src, rtv_dst, copyPipelineAlpha, copyPipelineLayout, copyPipelineSampler, width, height);
     cmd_list->get_private_data<state_tracking>().apply(cmd_list, true);
 }

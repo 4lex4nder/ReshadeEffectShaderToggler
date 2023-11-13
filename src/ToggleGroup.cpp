@@ -54,6 +54,7 @@ namespace ShaderToggler
         _copyTextureBinding = false;
         _previewClearAlpha = true;
         _tonemapHDRtoSDRtoHDR = false;
+        _preserveAlpha = false;
     }
 
 
@@ -233,6 +234,7 @@ namespace ShaderToggler
         iniFile.SetUInt("BindingMatchSwapchainResolutionOnly", _bindingMatchSwapchainResolution, "", sectionRoot);
         iniFile.SetBool("ClearPreviewAlpha", _previewClearAlpha, "", sectionRoot);
         iniFile.SetBool("TonemapHDRtoSDRtoHDR", _tonemapHDRtoSDRtoHDR, "", sectionRoot);
+        iniFile.SetBool("PreserveTargetAlphaChannel", _preserveAlpha, "", sectionRoot);
     }
 
 
@@ -480,5 +482,7 @@ namespace ShaderToggler
         _previewClearAlpha = iniFile.GetBoolOrDefault("ClearPreviewAlpha", sectionRoot, true);
 
         _tonemapHDRtoSDRtoHDR = iniFile.GetBoolOrDefault("TonemapHDRtoSDRtoHDR", sectionRoot, false);
+
+        _preserveAlpha = iniFile.GetBoolOrDefault("PreserveTargetAlphaChannel", sectionRoot, false);
     }
 }

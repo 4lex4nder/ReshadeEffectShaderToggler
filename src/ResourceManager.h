@@ -54,10 +54,15 @@ namespace Rendering
         void Init();
 
         void DisposePreview(reshade::api::effect_runtime* runtime);
+        void DisposeGroupBuffers(reshade::api::effect_runtime* runtime);
+        void DisposeGroupBuffer(reshade::api::effect_runtime* runtime, const ShaderToggler::ToggleGroup* group);
         void CheckPreview(reshade::api::command_list* cmd_list, reshade::api::device* device, reshade::api::effect_runtime* runtime);
+        void CheckGroupBuffer(reshade::api::command_list* cmd_list, reshade::api::device* device, reshade::api::effect_runtime* runtime, const ShaderToggler::ToggleGroup* group);
         void SetPingPreviewHandles(reshade::api::resource* res, reshade::api::resource_view* rtv, reshade::api::resource_view* srv);
         void SetPongPreviewHandles(reshade::api::resource* res, reshade::api::resource_view* rtv, reshade::api::resource_view* srv);
+        void SetGroupBufferHandles(const ShaderToggler::ToggleGroup* group, reshade::api::resource* res, reshade::api::resource_view* rtv, reshade::api::resource_view* rtv_srgb, reshade::api::resource_view* srv);
         bool IsCompatibleWithPreviewFormat(reshade::api::effect_runtime* runtime, reshade::api::resource res);
+        bool IsCompatibleWithGroupFormat(reshade::api::effect_runtime* runtime, reshade::api::resource res, const ShaderToggler::ToggleGroup* group);
 
         static EmbeddedResourceData GetResourceData(uint16_t id);
     private:
@@ -80,5 +85,7 @@ namespace Rendering
         reshade::api::resource preview_res[2];
         reshade::api::resource_view preview_rtv[2];
         reshade::api::resource_view preview_srv[2];
+
+        std::unordered_map<const ShaderToggler::ToggleGroup*, std::tuple<reshade::api::resource, reshade::api::resource_view, reshade::api::resource_view, reshade::api::resource_view>> group_buffers;
     };
 }

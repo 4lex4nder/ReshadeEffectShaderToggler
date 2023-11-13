@@ -90,7 +90,7 @@ static AddonUIData g_addonUIData(&g_pixelShaderManager, &g_vertexShaderManager, 
 static KeyMonitor keyMonitor;
 static Rendering::ResourceManager resourceManager;
 static Rendering::RenderingShaderManager renderingShaderManager(g_addonUIData, resourceManager);
-static Rendering::RenderingEffectManager renderingEffectManager(g_addonUIData, resourceManager);
+static Rendering::RenderingEffectManager renderingEffectManager(g_addonUIData, resourceManager, renderingShaderManager);
 static Rendering::RenderingBindingManager renderingBindingManager(g_addonUIData, resourceManager);
 static Rendering::RenderingPreviewManager renderingPreviewManager(g_addonUIData, resourceManager, renderingShaderManager);
 static Rendering::RenderingQueueManager renderingQueueManager(g_addonUIData, resourceManager);
@@ -533,6 +533,13 @@ static void onPresent(command_queue* queue, swapchain* swapchain, const rect* so
             renderingEffectManager.RenderRemainingEffects(runtime);
             resourceManager.CheckPreview(queue->get_immediate_command_list(), dev, runtime);
             renderingBindingManager.ClearUnmatchedTextureBindings(runtime->get_command_queue()->get_immediate_command_list());
+
+            for (auto& g : g_addonUIData.GetToggleGroups())
+            {
+                auto& [_, group] = g;
+                resourceManager.CheckGroupBuffer(queue->get_immediate_command_list(), dev, runtime, &group);
+                group.setRecreateBuffer(false);
+            }
         }
     }
 

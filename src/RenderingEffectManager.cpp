@@ -6,7 +6,7 @@ using namespace ShaderToggler;
 using namespace reshade::api;
 using namespace std;
 
-RenderingEffectManager::RenderingEffectManager(AddonImGui::AddonUIData& data, ResourceManager& rManager) : uiData(data), resourceManager(rManager)
+RenderingEffectManager::RenderingEffectManager(AddonImGui::AddonUIData& data, ResourceManager& rManager, RenderingShaderManager& shManager) : uiData(data), resourceManager(rManager), shaderManager(shManager)
 {
 }
 
@@ -62,7 +62,7 @@ bool RenderingEffectManager::_RenderEffects(
     CommandListDataContainer& cmdData = cmd_list->get_private_data<CommandListDataContainer>();
     effect_runtime* runtime = deviceData.current_runtime;
 
-    unordered_map<const ToggleGroup*, pair<vector<pair<string, EffectData*>>, resource>> groupTechMap;
+    unordered_map<ToggleGroup*, pair<vector<pair<string, EffectData*>>, resource>> groupTechMap;
 
     for (const auto& sTech : deviceData.allSortedTechniques)
     {
@@ -102,8 +102,30 @@ bool RenderingEffectManager::_RenderEffects(
 
         resource_view view_non_srgb = {};
         resource_view view_srgb = {};
+        resource_view group_view = {};
+        resource_desc desc = cmd_list->get_device()->get_resource_desc(active_resource);
+        bool copyPreserveAlpha = false;
 
-        resourceManager.SetResourceViewHandles(active_resource.handle, &view_non_srgb, &view_srgb);
+        if (group->getPreserveAlpha())
+        {
+            if (resourceManager.IsCompatibleWithGroupFormat(runtime, active_resource, group))
+            {
+                resource group_res = {};
+                resourceManager.SetGroupBufferHandles(group, &group_res, &view_non_srgb, &view_srgb, &group_view);
+                cmd_list->copy_resource(active_resource, group_res);
+                copyPreserveAlpha = true;
+            }
+            else
+            {
+                resourceManager.SetResourceViewHandles(active_resource.handle, &view_non_srgb, &view_srgb);
+                group->setRecreateBuffer(true);
+                group->setTargetBufferDescription(desc);
+            }
+        }
+        else
+        {
+            resourceManager.SetResourceViewHandles(active_resource.handle, &view_non_srgb, &view_srgb);
+        }
 
         if (view_non_srgb == 0)
         {
@@ -132,6 +154,15 @@ bool RenderingEffectManager::_RenderEffects(
         if (group->getToneMap() && deviceData.specialEffects.tonemap_to_hdr.technique != 0)
         {
             runtime->render_technique(deviceData.specialEffects.tonemap_to_hdr.technique, cmd_list, view_non_srgb, view_srgb);
+        }
+
+        if (copyPreserveAlpha)
+        {
+            resource_view target_view_non_srgb = {};
+            resource_view target_view_srgb = {};
+
+            resourceManager.SetResourceViewHandles(active_resource.handle, &target_view_non_srgb, &target_view_srgb);
+            shaderManager.CopyResourceMaskAlpha(cmd_list, group_view, target_view_non_srgb, desc.texture.width, desc.texture.height);
         }
     }
 
