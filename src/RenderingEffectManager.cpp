@@ -133,6 +133,11 @@ bool RenderingEffectManager::_RenderEffects(
             continue;
         }
 
+        if (group->getFlipBuffer() && deviceData.specialEffects.flip.technique != 0)
+        {
+            runtime->render_technique(deviceData.specialEffects.flip.technique, cmd_list, view_non_srgb, view_srgb);
+        }
+
         if (group->getToneMap() && deviceData.specialEffects.tonemap_to_sdr.technique != 0)
         {
             runtime->render_technique(deviceData.specialEffects.tonemap_to_sdr.technique, cmd_list, view_non_srgb, view_srgb);
@@ -155,6 +160,11 @@ bool RenderingEffectManager::_RenderEffects(
         if (group->getToneMap() && deviceData.specialEffects.tonemap_to_hdr.technique != 0)
         {
             runtime->render_technique(deviceData.specialEffects.tonemap_to_hdr.technique, cmd_list, view_non_srgb, view_srgb);
+        }
+
+        if (group->getFlipBuffer() && deviceData.specialEffects.flip.technique != 0)
+        {
+            runtime->render_technique(deviceData.specialEffects.flip.technique, cmd_list, view_non_srgb, view_srgb);
         }
 
         if (copyPreserveAlpha)

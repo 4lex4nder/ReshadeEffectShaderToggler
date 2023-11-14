@@ -36,6 +36,12 @@ void TechniqueManager::OnReshadeReloadedEffects(reshade::api::effect_runtime* ru
             return;
         }
 
+        if (name == data.specialEffects.flip.name)
+        {
+            data.specialEffects.flip.technique = technique;
+            return;
+        }
+
         const auto& it = data.allTechniques.emplace(name, EffectData{ technique, runtime, enabled });
         data.allSortedTechniques.push_back(make_pair(name, &it.first->second));
     
@@ -54,7 +60,7 @@ bool TechniqueManager::OnReshadeSetTechniqueState(reshade::api::effect_runtime* 
     string techName(charBuffer);
 
     // Prevent REST techniques from being manually enabled
-    if (techName == data.specialEffects.tonemap_to_hdr.name || techName == data.specialEffects.tonemap_to_sdr.name)
+    if (techName == data.specialEffects.tonemap_to_hdr.name || techName == data.specialEffects.tonemap_to_sdr.name || techName == data.specialEffects.flip.name)
     {
         return true;
     }
@@ -112,6 +118,11 @@ bool TechniqueManager::OnReshadeReorderTechniques(reshade::api::effect_runtime* 
         if (name == data.specialEffects.tonemap_to_sdr.name)
         {
             data.specialEffects.tonemap_to_sdr.technique = technique;
+            continue;
+        }
+        if (name == data.specialEffects.flip.name)
+        {
+            data.specialEffects.flip.technique = technique;
             continue;
         }
 

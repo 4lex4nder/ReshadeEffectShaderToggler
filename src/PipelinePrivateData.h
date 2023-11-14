@@ -127,6 +127,7 @@ struct __declspec(novtable) SpecialEffects final
 {
     SpecialEffect tonemap_to_sdr = SpecialEffect{ "REST_TONEMAP_TO_SDR", reshade::api::effect_technique {0} };
     SpecialEffect tonemap_to_hdr = SpecialEffect{ "REST_TONEMAP_TO_HDR", reshade::api::effect_technique {0} };
+    SpecialEffect flip = SpecialEffect{ "REST_FLIP", reshade::api::effect_technique {0} };
 };
 
 struct __declspec(uuid("C63E95B1-4E2F-46D6-A276-E8B4612C069A")) DeviceDataContainer {

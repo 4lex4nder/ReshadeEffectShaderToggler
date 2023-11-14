@@ -307,6 +307,7 @@ static void DisplayRenderTargets(AddonImGui::AddonUIData& instance, Rendering::R
     bool retry = group->getRequeueAfterRTMatchingFailure();
     bool tonemap = group->getToneMap();
     bool preserveAlpha = group->getPreserveAlpha();
+    bool flipbuffer = group->getFlipBuffer();
     static const char* swapchainMatchOptions[] = { "RESOLUTION", "ASPECT RATIO", "EXTENDED ASPECT RATIO", "NONE"};
     uint32_t selectedSwapchainMatchMode = group->getMatchSwapchainResolution();
     const char* typesSelectedSwapchainMatchMode = swapchainMatchOptions[selectedSwapchainMatchMode];
@@ -379,6 +380,13 @@ static void DisplayRenderTargets(AddonImGui::AddonUIData& instance, Rendering::R
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
 
+            ImGui::Text("Flip render target");
+            ImGui::TableNextColumn();
+            ImGui::Checkbox("##flipbuffer", &flipbuffer);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+
             ImGui::Text("Preserve target alpha channel");
             ImGui::TableNextColumn();
             ImGui::Checkbox("##preserveAlpha", &preserveAlpha);
@@ -412,6 +420,7 @@ static void DisplayRenderTargets(AddonImGui::AddonUIData& instance, Rendering::R
         group->setInvocationLocation(selectedIndex);
         group->setToneMap(tonemap);
         group->setPreserveAlpha(preserveAlpha);
+        group->setFlipBuffer(flipbuffer);
 
         ImGui::Separator();
 

@@ -235,6 +235,7 @@ namespace ShaderToggler
         iniFile.SetBool("ClearPreviewAlpha", _previewClearAlpha, "", sectionRoot);
         iniFile.SetBool("TonemapHDRtoSDRtoHDR", _tonemapHDRtoSDRtoHDR, "", sectionRoot);
         iniFile.SetBool("PreserveTargetAlphaChannel", _preserveAlpha, "", sectionRoot);
+        iniFile.SetBool("FlipBuffer", _flipBuffer, "", sectionRoot);
     }
 
 
@@ -484,5 +485,7 @@ namespace ShaderToggler
         _tonemapHDRtoSDRtoHDR = iniFile.GetBoolOrDefault("TonemapHDRtoSDRtoHDR", sectionRoot, false);
 
         _preserveAlpha = iniFile.GetBoolOrDefault("PreserveTargetAlphaChannel", sectionRoot, false);
+
+        _flipBuffer = iniFile.GetBoolOrDefault("FlipBuffer", sectionRoot, false);
     }
 }
