@@ -1068,7 +1068,7 @@ static void DisplaySettings(AddonImGui::AddonUIData& instance, reshade::api::eff
         }
         ImGui::Separator();
 
-        std::vector<ShaderToggler::ToggleGroup> toRemove;
+        std::vector<ShaderToggler::ToggleGroup*> toRemove;
         for (auto& [_,group] : instance.GetToggleGroups())
         {
 
@@ -1076,7 +1076,7 @@ static void DisplaySettings(AddonImGui::AddonUIData& instance, reshade::api::eff
             ImGui::AlignTextToFramePadding();
             if (ImGui::Button("X"))
             {
-                toRemove.push_back(group);
+                toRemove.push_back(&group);
             }
             ImGui::SameLine();
             ImGui::Text(" %d ", group.getId());
@@ -1185,8 +1185,10 @@ static void DisplaySettings(AddonImGui::AddonUIData& instance, reshade::api::eff
         }
         for (const auto& group : toRemove)
         {
+            instance.SignalToggleGroupRemoved(runtime, group);
+
             std::erase_if(instance.GetToggleGroups(), [&group](const auto& item) {
-                return item.first == group.getId();
+                return item.first == group->getId();
                 });
         }
 

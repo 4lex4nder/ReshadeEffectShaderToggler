@@ -604,6 +604,8 @@ static bool Init()
     resourceManager.SetResourceShim(g_addonUIData.GetResourceShim());
     resourceManager.Init();
 
+    g_addonUIData.AddToggleGroupRemovalCallback(std::bind(&Rendering::ToggleGroupResourceManager::ToggleGroupRemoved, &groupResourceManager, std::placeholders::_1, std::placeholders::_2));
+
     return constantManager.Init(g_addonUIData, &constantCopy, &constantHandler);
 }
 

@@ -70,6 +70,18 @@ unordered_map<int, ToggleGroup>& AddonUIData::GetToggleGroups()
     return _toggleGroups;
 }
 
+void AddonUIData::AddToggleGroupRemovalCallback(std::function<void(reshade::api::effect_runtime*, ShaderToggler::ToggleGroup*)> callback)
+{
+    _removalCallbacks.push_back(callback);
+}
+
+void AddonUIData::SignalToggleGroupRemoved(reshade::api::effect_runtime* runtime, ShaderToggler::ToggleGroup* group)
+{
+    for (auto& func : _removalCallbacks)
+    {
+        func(runtime, group);
+    }
+}
 
 const vector<ToggleGroup*>* AddonUIData::GetToggleGroupsForPixelShaderHash(uint32_t hash)
 {

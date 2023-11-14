@@ -114,6 +114,8 @@ namespace AddonImGui
         bool _trackDescriptors = true;
         std::filesystem::path _basePath;
         TabType _currentTab = TabType::TAB_NONE;
+
+        std::vector<std::function<void(reshade::api::effect_runtime*, ShaderToggler::ToggleGroup*)>> _removalCallbacks;
     public:
         AddonUIData(ShaderToggler::ShaderManager* pixelShaderManager, ShaderToggler::ShaderManager* vertexShaderManager, ShaderToggler::ShaderManager* computeShaderManager, Shim::Constants::ConstantHandlerBase* constants, std::atomic_uint32_t* activeCollectorFrameCounter,
             std::vector<std::string>* techniques);
@@ -135,7 +137,6 @@ namespace AddonImGui
         std::filesystem::path GetBasePath() { return _basePath; };
         void SaveShaderTogglerIniFile(const std::string& fileName = HASH_FILE_NAME);
         void LoadShaderTogglerIniFile(const std::string& fileName = HASH_FILE_NAME);
-        void ResetKeyBinding(ShaderToggler::ToggleGroup& groupgroupEditing);
         std::atomic_int& GetToggleGroupIdShaderEditing() { return _toggleGroupIdShaderEditing; }
         std::atomic_int& GetToggleGroupIdEffectEditing() { return _toggleGroupIdEffectEditing; }
         std::atomic_int& GetToggleGroupIdConstantEditing() { return _toggleGroupIdConstantEditing; }
@@ -162,5 +163,7 @@ namespace AddonImGui
         const std::unordered_map<std::string, std::tuple<Shim::Constants::constant_type, std::vector<reshade::api::effect_uniform_variable>>>* GetRESTVariables() { return _constantHandler->GetRESTVariables(); };
         bool GetTrackDescriptors() const { return _trackDescriptors; }
         void SetTrackDescriptors(bool track) { _trackDescriptors = track; }
+        void AddToggleGroupRemovalCallback(std::function<void(reshade::api::effect_runtime*, ShaderToggler::ToggleGroup*)> callback);
+        void SignalToggleGroupRemoved(reshade::api::effect_runtime*, ShaderToggler::ToggleGroup*);
     };
 }
