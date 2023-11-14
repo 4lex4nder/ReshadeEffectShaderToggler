@@ -6,7 +6,8 @@ using namespace ShaderToggler;
 using namespace reshade::api;
 using namespace std;
 
-RenderingEffectManager::RenderingEffectManager(AddonImGui::AddonUIData& data, ResourceManager& rManager, RenderingShaderManager& shManager) : uiData(data), resourceManager(rManager), shaderManager(shManager)
+RenderingEffectManager::RenderingEffectManager(AddonImGui::AddonUIData& data, ResourceManager& rManager, RenderingShaderManager& shManager, ToggleGroupResourceManager& tgrManager) : 
+    uiData(data), resourceManager(rManager), shaderManager(shManager), groupResourceManager(tgrManager)
 {
 }
 
@@ -108,10 +109,10 @@ bool RenderingEffectManager::_RenderEffects(
 
         if (group->getPreserveAlpha())
         {
-            if (resourceManager.IsCompatibleWithGroupFormat(runtime, active_resource, group))
+            if (groupResourceManager.IsCompatibleWithGroupFormat(runtime, active_resource, group))
             {
                 resource group_res = {};
-                resourceManager.SetGroupBufferHandles(group, &group_res, &view_non_srgb, &view_srgb, &group_view);
+                groupResourceManager.SetGroupBufferHandles(group, &group_res, &view_non_srgb, &view_srgb, &group_view);
                 cmd_list->copy_resource(active_resource, group_res);
                 copyPreserveAlpha = true;
             }
