@@ -80,7 +80,7 @@ namespace Shim
             ConstantHandlerBase();
             ~ConstantHandlerBase();
 
-            void SetBufferRange(const ShaderToggler::ToggleGroup* group, reshade::api::buffer_range range, reshade::api::device * dev, reshade::api::command_list* cmd_list);
+            void SetBufferRange(ShaderToggler::ToggleGroup* group, reshade::api::buffer_range range, reshade::api::device * dev, reshade::api::command_list* cmd_list);
             void SetConstants(const ShaderToggler::ToggleGroup* group, const std::vector<uint32_t>& buf, reshade::api::device* dev, reshade::api::command_list* cmd_list);
             std::shared_mutex& GetBufferMutex() { return groupBufferMutex; }
             void RemoveGroup(const ShaderToggler::ToggleGroup*, reshade::api::device* dev);

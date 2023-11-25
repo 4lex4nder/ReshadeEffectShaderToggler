@@ -3,6 +3,7 @@
 #include "AddonUIData.h"
 #include "ConstantHandlerBase.h"
 #include "ConstantCopyBase.h"
+#include "ToggleGroupResourceManager.h"
 
 namespace Shim
 {
@@ -35,7 +36,7 @@ namespace Shim
         class ConstantManager
         {
         public:
-            static bool Init(AddonImGui::AddonUIData& data, ConstantCopyBase**, ConstantHandlerBase**);
+            static bool Init(AddonImGui::AddonUIData& data, Rendering::ToggleGroupResourceManager& gResourceManager, ConstantCopyBase**, ConstantHandlerBase**);
             static bool UnInit();
 
         private:

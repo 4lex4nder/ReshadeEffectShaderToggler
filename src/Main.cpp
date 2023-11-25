@@ -92,7 +92,7 @@ static Rendering::ResourceManager resourceManager;
 static Rendering::ToggleGroupResourceManager groupResourceManager;
 static Rendering::RenderingShaderManager renderingShaderManager(g_addonUIData, resourceManager);
 static Rendering::RenderingEffectManager renderingEffectManager(g_addonUIData, resourceManager, renderingShaderManager, groupResourceManager);
-static Rendering::RenderingBindingManager renderingBindingManager(g_addonUIData, resourceManager);
+static Rendering::RenderingBindingManager renderingBindingManager(g_addonUIData, resourceManager, groupResourceManager);
 static Rendering::RenderingPreviewManager renderingPreviewManager(g_addonUIData, resourceManager, renderingShaderManager);
 static Rendering::RenderingQueueManager renderingQueueManager(g_addonUIData, resourceManager);
 static ShaderToggler::TechniqueManager techniqueManager(keyMonitor, allTechniques);
@@ -287,6 +287,7 @@ static void onDestroyEffectRuntime(effect_runtime* runtime)
     // Pick the runtime on top of our stack if there are any
     if (runtime == data.current_runtime)
     {
+        groupResourceManager.DisposeGroupBuffers(runtime, g_addonUIData.GetToggleGroups());
         renderingBindingManager.DisposeTextureBindings(runtime);
 
         if (runtimes.size() > 0)
@@ -533,8 +534,8 @@ static void onPresent(command_queue* queue, swapchain* swapchain, const rect* so
         {
             renderingEffectManager.RenderRemainingEffects(runtime);
             resourceManager.CheckPreview(queue->get_immediate_command_list(), dev, runtime);
+            groupResourceManager.CheckGroupBuffers(runtime, g_addonUIData.GetToggleGroups());
             renderingBindingManager.ClearUnmatchedTextureBindings(runtime->get_command_queue()->get_immediate_command_list());
-            groupResourceManager.CheckGroupBuffers(queue->get_immediate_command_list(), dev, runtime);
         }
     }
 
@@ -606,7 +607,7 @@ static bool Init()
 
     g_addonUIData.AddToggleGroupRemovalCallback(std::bind(&Rendering::ToggleGroupResourceManager::ToggleGroupRemoved, &groupResourceManager, std::placeholders::_1, std::placeholders::_2));
 
-    return constantManager.Init(g_addonUIData, &constantCopy, &constantHandler);
+    return constantManager.Init(g_addonUIData, groupResourceManager, &constantCopy, &constantHandler);
 }
 
 

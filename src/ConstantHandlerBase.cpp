@@ -390,7 +390,7 @@ void ConstantHandlerBase::SetConstants(const ToggleGroup* group, const vector<ui
     std::memcpy(bufferContent.data(), reinterpret_cast<const uint8_t*>(buf.data()), buf.size() * 4);
 }
 
-void ConstantHandlerBase::SetBufferRange(const ToggleGroup* group, buffer_range range, device* dev, command_list* cmd_list)
+void ConstantHandlerBase::SetBufferRange(ToggleGroup* group, buffer_range range, device* dev, command_list* cmd_list)
 {
     if (dev == nullptr || cmd_list == nullptr || range.buffer == 0)
     {
@@ -406,7 +406,7 @@ void ConstantHandlerBase::SetBufferRange(const ToggleGroup* group, buffer_range 
     vector<uint8_t>& prevBufferContent = groupPrevBufferContent.at(group);
 
     std::memcpy(prevBufferContent.data(), bufferContent.data(), size);
-    _constCopy->GetHostConstantBuffer(cmd_list, bufferContent, size, range.buffer.handle);
+    _constCopy->GetHostConstantBuffer(cmd_list, group, bufferContent, size, range.buffer.handle);
 }
 
 void ConstantHandlerBase::InitBuffers(const ToggleGroup* group, size_t size)

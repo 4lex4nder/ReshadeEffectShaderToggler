@@ -105,22 +105,23 @@ bool RenderingEffectManager::_RenderEffects(
         resource_view view_srgb = {};
         resource_view group_view = {};
         resource_desc desc = cmd_list->get_device()->get_resource_desc(active_resource);
+        GroupResource& groupResource = group->GetGroupResource(GroupResourceType::RESOURCE_ALPHA);
         bool copyPreserveAlpha = false;
 
         if (group->getPreserveAlpha())
         {
-            if (groupResourceManager.IsCompatibleWithGroupFormat(runtime, active_resource, group))
+            if (groupResourceManager.IsCompatibleWithGroupFormat(runtime->get_device(), GroupResourceType::RESOURCE_ALPHA, active_resource, group))
             {
                 resource group_res = {};
-                groupResourceManager.SetGroupBufferHandles(group, &group_res, &view_non_srgb, &view_srgb, &group_view);
+                groupResourceManager.SetGroupBufferHandles(group, GroupResourceType::RESOURCE_ALPHA, &group_res, &view_non_srgb, &view_srgb, &group_view);
                 cmd_list->copy_resource(active_resource, group_res);
                 copyPreserveAlpha = true;
             }
             else
             {
                 resourceManager.SetResourceViewHandles(active_resource.handle, &view_non_srgb, &view_srgb);
-                group->setRecreateBuffer(true);
-                group->setTargetBufferDescription(desc);
+                groupResource.state = GroupResourceState::RESOURCE_INVALID;
+                groupResource.target_description = desc;
             }
         }
         else

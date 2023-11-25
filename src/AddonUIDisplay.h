@@ -263,30 +263,27 @@ static void DisplayPreview(AddonImGui::AddonUIData& instance, Rendering::Resourc
     ImGui::EndChild();
 }
 
-static void DisplayBindingPreview(AddonImGui::AddonUIData& instance, Rendering::ResourceManager& resManager, reshade::api::effect_runtime* runtime, const std::string& binding)
+static void DisplayBindingPreview(AddonImGui::AddonUIData& instance, Rendering::ResourceManager& resManager, reshade::api::effect_runtime* runtime, ShaderToggler::ToggleGroup* group)
 {
     if (ImGui::BeginChild("BindingPreview##child", { 0, 0 }, true, ImGuiWindowFlags_None))
     {
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(3, 3));
 
         DeviceDataContainer& deviceData = runtime->get_device()->get_private_data<DeviceDataContainer>();
-        reshade::api::resource_view srv = reshade::api::resource_view{ 0 };
-        resManager.SetPongPreviewHandles(nullptr, nullptr, &srv);
-        const auto& it = deviceData.bindingMap.find(binding);
+        ShaderToggler::GroupResource& groupResource = group->GetGroupResource(ShaderToggler::GroupResourceType::RESOURCE_BINDING);
 
-        if (it != deviceData.bindingMap.end())
+        if (groupResource.srv != 0)
         {
-            auto& [_, texData] = *it;
-            ImGui::Text(std::format("Format: {} ", static_cast<uint32_t>(texData.format)).c_str());
+            ImGui::Text(std::format("Format: {} ", static_cast<uint32_t>(groupResource.target_description.texture.format)).c_str());
             ImGui::SameLine();
-            ImGui::Text(std::format("Width: {} ", texData.width).c_str());
+            ImGui::Text(std::format("Width: {} ", groupResource.target_description.texture.width).c_str());
             ImGui::SameLine();
-            ImGui::Text(std::format("Height: {} ", texData.height).c_str());
+            ImGui::Text(std::format("Height: {} ", groupResource.target_description.texture.height).c_str());
             ImGui::Separator();
 
             if (ImGui::BeginChild("BindingPreview##preview", { 0, 0 }, false, ImGuiWindowFlags_None))
             {
-                DrawPreview(texData.srv.handle, texData.width, texData.height);
+                DrawPreview(groupResource.srv.handle, groupResource.target_description.texture.width, groupResource.target_description.texture.height);
             }
             ImGui::EndChild();
         }
@@ -811,7 +808,7 @@ static void DisplayTextureBindings(AddonImGui::AddonUIData& instance, ShaderTogg
     if (ImGui::IsItemActive())
         height += ImGui::GetIO().MouseDelta.y;
 
-    DisplayBindingPreview(instance, resManager, runtime, group->getTextureBindingName());
+    DisplayBindingPreview(instance, resManager, runtime, group);
 
     ImGui::PopStyleVar();
 }

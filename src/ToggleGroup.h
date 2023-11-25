@@ -34,6 +34,8 @@
 #include <string>
 #include <unordered_set>
 #include <unordered_map>
+#include <array>
+#include <functional>
 
 #include "reshade.hpp"
 #include "CDataFile.h"
@@ -55,11 +57,47 @@ namespace ShaderToggler
         SWAPCHAIN_MATCH_MODE_NONE = 3
     };
 
+    enum class GroupResourceType : uint32_t
+    {
+        RESOURCE_ALPHA = 0,
+        RESOURCE_BINDING = 1,
+        RESOURCE_CONSTANTS_COPY = 2
+    };
+
+    enum class GroupResourceState : uint32_t
+    {
+        RESOURCE_VALID = 1,
+        RESOURCE_INVALID = 2,
+        //RESOURCE_RECREATING = 2,
+        RESOURCE_RECREATED = 4,
+        RESOURCE_CLEARED = 8,
+    };
+
+    constexpr uint32_t GroupResourceTypeCount = 3;
+
+    struct __declspec(novtable) GroupResource final
+    {
+        reshade::api::resource res;
+        reshade::api::resource_view rtv;
+        reshade::api::resource_view rtv_srgb;
+        reshade::api::resource_view srv;
+        reshade::api::resource_desc target_description;
+        std::function<bool()> enabled;
+        std::function<bool()> clear_on_miss;
+        //bool recreate;
+        GroupResourceState state;
+        bool owning;
+        //bool cleared;
+        //bool recreated;
+    };
+
     class ToggleGroup
     {
     public:
         ToggleGroup(std::string name, int Id);
         ToggleGroup();
+        //ToggleGroup(ToggleGroup&&) noexcept = default;
+        ToggleGroup(const ToggleGroup& other); // no copy
 
         static int getNewGroupId();
 
@@ -154,10 +192,6 @@ namespace ShaderToggler
         void setFlipBuffer(bool flip) { _flipBuffer = flip; }
         bool getFlipBufferBinding() const { return _flipBufferBinding; }
         void setFlipBufferBinding(bool flip) { _flipBufferBinding = flip; }
-        const reshade::api::resource_desc& getTargetBufferDescription() const { return _bufferDesc; }
-        void setTargetBufferDescription(const reshade::api::resource_desc& desc) { _bufferDesc = desc; }
-        bool getRecreateBuffer() const { return _recreateBuffer; }
-        void setRecreateBuffer(bool recreate) { _recreateBuffer = recreate; }
         void dispatchCBCycle(DescriptorCycle cycle) { _cbCycle = cycle; }
         DescriptorCycle consumeCBCycle() 
         { 
@@ -180,10 +214,17 @@ namespace ShaderToggler
             return ret;
         }
 
+        GroupResource& GetGroupResource(GroupResourceType type);
+
         bool operator==(const ToggleGroup& rhs)
         {
             return getId() == rhs.getId();
         }
+
+        bool AlphaEnabled() { return _preserveAlpha; }
+        bool AlphaClear() { return false; }
+        bool BindingEnabled() { return _isProvidingTextureBinding && _copyTextureBinding; }
+        bool BindingClear() { return _clearBindings; }
 
     private:
         int _id;
@@ -205,15 +246,15 @@ namespace ShaderToggler
         bool _isActive;				// true means the group is actively toggled (so the hashes have to be hidden.
         bool _isEditing;			// true means the group is actively edited (name, key)
         bool _allowAllTechniques;	// true means all techniques are allowed, regardless of preferred techniques.
-        bool _isProvidingTextureBinding;
-        bool _copyTextureBinding;
+        volatile bool _isProvidingTextureBinding;
+        volatile bool _copyTextureBinding;
         bool _extractConstants;
         bool _extractResourceViews;
-        bool _clearBindings;
+        volatile bool _clearBindings;
         bool _previewClearAlpha = true;
         bool _hasTechniqueExceptions; // _preferredTechniques are handled as exception to _allowAllTechniques
         bool _tonemapHDRtoSDRtoHDR = false;
-        bool _preserveAlpha = false;
+        volatile bool _preserveAlpha = false;
         bool _flipBuffer = false;
         bool _flipBufferBinding = false;
         uint32_t _matchSwapchainResolution = SWAPCHAIN_MATCH_MODE_RESOLUTION;
@@ -226,7 +267,7 @@ namespace ShaderToggler
         DescriptorCycle _cbCycle;
         DescriptorCycle _srvCycle;
         DescriptorCycle _rtCycle;
-        reshade::api::resource_desc _bufferDesc = {};
-        bool _recreateBuffer = false;
+
+        std::array<GroupResource, 3> _group_buffers;
     };
 }

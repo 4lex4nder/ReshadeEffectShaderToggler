@@ -31,6 +31,7 @@
 /////////////////////////////////////////////////////////////////////////
 
 #include <format>
+#include <functional>
 #include "AddonUIData.h"
 #include "RenderingManager.h"
 
@@ -253,8 +254,8 @@ void AddonUIData::LoadShaderTogglerIniFile(const string& fileName)
     {
         for (int i = 0; i < numberOfGroups; i++)
         {
-            ToggleGroup group("", ToggleGroup::getNewGroupId());
-            _toggleGroups.emplace(group.getId(), group);
+            int nId = ToggleGroup::getNewGroupId();
+            const auto& xx = _toggleGroups.emplace(nId, ToggleGroup{"", nId });
         }
     }
     for (auto& [_,group] : _toggleGroups)

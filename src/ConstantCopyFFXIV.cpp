@@ -28,7 +28,7 @@ bool ConstantCopyFFXIV::UnInit()
     return MH_Uninitialize() == MH_OK;
 }
 
-void ConstantCopyFFXIV::GetHostConstantBuffer(command_list* cmd_list, vector<uint8_t>& dest, size_t size, uint64_t resourceHandle)
+void ConstantCopyFFXIV::GetHostConstantBuffer(command_list* cmd_list, ShaderToggler::ToggleGroup* group, vector<uint8_t>& dest, size_t size, uint64_t resourceHandle)
 {
     for (uint32_t i = 0; i < _hostResourceBuffer.size(); i++)
     {

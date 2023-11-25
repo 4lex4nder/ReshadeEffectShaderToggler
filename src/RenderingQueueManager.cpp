@@ -50,18 +50,18 @@ void RenderingQueueManager::_CheckCallForCommandList(ShaderData& sData, CommandL
                     }
                 }
 
-                if (group->isProvidingTextureBinding() && !deviceData.bindingsUpdated.contains(group->getTextureBindingName()))
+                if (group->isProvidingTextureBinding() && !deviceData.bindingsUpdated.contains(group))
                 {
-                    if (!sData.bindingsToUpdate.contains(group->getTextureBindingName()))
+                    if (!sData.bindingsToUpdate.contains(group))
                     {
                         if (!group->getCopyTextureBinding() || group->getExtractResourceViews())
                         {
-                            sData.bindingsToUpdate.emplace(group->getTextureBindingName(), std::make_tuple(group, CALL_DRAW, resource{ 0 }));
+                            sData.bindingsToUpdate.emplace(group, std::make_tuple(CALL_DRAW, resource{ 0 }));
                             queue_mask |= (match_binding << CALL_DRAW * MATCH_DELIMITER);
                         }
                         else
                         {
-                            sData.bindingsToUpdate.emplace(group->getTextureBindingName(), std::make_tuple(group, group->getBindingInvocationLocation(), resource{ 0 }));
+                            sData.bindingsToUpdate.emplace(group, std::make_tuple(group->getBindingInvocationLocation(), resource{ 0 }));
                             queue_mask |= (match_binding << (group->getBindingInvocationLocation() * MATCH_DELIMITER)) | (match_binding << (CALL_DRAW * MATCH_DELIMITER));
                         }
                     }
@@ -160,8 +160,8 @@ void RenderingQueueManager::_RescheduleGroups(ShaderData& sData, CommandListData
 
     for (const auto& tech : sData.bindingsToUpdate)
     {
-        const ToggleGroup* group = std::get<0>(tech.second);
-        const resource res = std::get<2>(tech.second);
+        const ToggleGroup* group = tech.first;
+        const resource res = std::get<1>(tech.second);
 
         if (res == 0 && group->getRequeueAfterRTMatchingFailure())
         {
@@ -214,6 +214,23 @@ static void clearStage(CommandListDataContainer& commandListData, effect_queue& 
         for (auto it = queuedTasks.begin(); it != queuedTasks.end();)
         {
             uint64_t callLocation = std::get<1>(it->second);
+            if (callLocation == location)
+            {
+                it = queuedTasks.erase(it);
+                continue;
+            }
+            it++;
+        }
+    }
+}
+
+static void clearStage(CommandListDataContainer& commandListData, binding_queue& queuedTasks, uint64_t pipelineChange, uint64_t clearFlag, uint64_t location)
+{
+    if (queuedTasks.size() > 0 && (pipelineChange & clearFlag))
+    {
+        for (auto it = queuedTasks.begin(); it != queuedTasks.end();)
+        {
+            uint64_t callLocation = std::get<0>(it->second);
             if (callLocation == location)
             {
                 it = queuedTasks.erase(it);

@@ -35,7 +35,7 @@ ConstantHandlerType ConstantManager::ResolveConstantHandlerType(const string& ht
     return ConstantHandlerType::Handler_Default;
 }
 
-bool ConstantManager::Init(AddonImGui::AddonUIData& data, ConstantCopyBase** constantCopy, ConstantHandlerBase** constantHandler)
+bool ConstantManager::Init(AddonImGui::AddonUIData& data, Rendering::ToggleGroupResourceManager& gResourceManager, ConstantCopyBase** constantCopy, ConstantHandlerBase** constantHandler)
 {
     const string& hookType = data.GetConstHookType();
     const string& hookCopyType = data.GetConstHookCopyType();
@@ -73,7 +73,7 @@ bool ConstantManager::Init(AddonImGui::AddonUIData& data, ConstantCopyBase** con
         break;
     case ConstantCopyType::Copy_GPUReadback:
     {
-        static ConstantCopyGPUReadback constantTypeGPUReadback;
+        static ConstantCopyGPUReadback constantTypeGPUReadback(gResourceManager);
         *constantCopy = &constantTypeGPUReadback;
     }
         break;

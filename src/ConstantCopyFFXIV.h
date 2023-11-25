@@ -76,7 +76,7 @@ namespace Shim
             void OnUpdateBufferRegion(reshade::api::device* device, const void* data, reshade::api::resource resource, uint64_t offset, uint64_t size) override final {};
             void OnMapBufferRegion(reshade::api::device* device, reshade::api::resource resource, uint64_t offset, uint64_t size, reshade::api::map_access access, void** data) override final {};
             void OnUnmapBufferRegion(reshade::api::device* device, reshade::api::resource resource) override final {};
-            void GetHostConstantBuffer(reshade::api::command_list* cmd_list, std::vector<uint8_t>& dest, size_t size, uint64_t resourceHandle) override final;
+            void GetHostConstantBuffer(reshade::api::command_list* cmd_list, ShaderToggler::ToggleGroup* group, std::vector<uint8_t>& dest, size_t size, uint64_t resourceHandle) override final;
         private:
             static std::vector<std::tuple<const void*, uint64_t, size_t>> _hostResourceBuffer;
             static sig_ffxiv_cbload* org_ffxiv_cbload;

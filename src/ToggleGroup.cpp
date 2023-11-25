@@ -55,11 +55,64 @@ namespace ShaderToggler
         _previewClearAlpha = true;
         _tonemapHDRtoSDRtoHDR = false;
         _preserveAlpha = false;
+        _cbCycle = CYCLE_NONE;
+        _srvCycle = CYCLE_NONE;
+        _rtCycle = CYCLE_NONE;
+
+        _group_buffers[static_cast<uint32_t>(GroupResourceType::RESOURCE_ALPHA)] = { {}, {}, {}, {}, {}, [&]() { return _preserveAlpha; }, [&]() { return false; }, GroupResourceState::RESOURCE_INVALID, true };
+        _group_buffers[static_cast<uint32_t>(GroupResourceType::RESOURCE_BINDING)] = { {}, {}, {}, {}, {}, [&]() { return _copyTextureBinding && _isProvidingTextureBinding; }, [&]() { return _clearBindings; }, GroupResourceState::RESOURCE_INVALID, true };
+        _group_buffers[static_cast<uint32_t>(GroupResourceType::RESOURCE_CONSTANTS_COPY)] = { {}, {}, {}, {}, {}, [&]() { return _extractConstants; }, [&]() { return false; }, GroupResourceState::RESOURCE_INVALID, true };
     }
 
 
     ToggleGroup::ToggleGroup() : ToggleGroup("Default", 0)
     {
+    }
+
+
+
+    ToggleGroup::ToggleGroup(const ToggleGroup& other) : ToggleGroup()
+    {
+        _id = other._id;
+        _name = other._name;
+        _keybind = other._keybind;
+        _vertexShaderHashes = other._vertexShaderHashes;
+        _pixelShaderHashes = other._pixelShaderHashes;
+        _computeShaderHashes = other._computeShaderHashes;
+        _invocationLocation = other._invocationLocation;
+        _rtIndex = other._rtIndex;
+        _cbSlotIndex = other._cbSlotIndex;
+        _cbDescIndex = other._cbDescIndex;
+        _cbShaderStage = other._cbShaderStage;
+        _bindingInvocationLocation = other._bindingInvocationLocation;
+        _bindingRTIndex = other._bindingRTIndex;
+        _bindingSrvSlotIndex = other._bindingSrvSlotIndex;
+        _bindingSrvDescIndex = other._bindingSrvDescIndex;
+        _bindingSrvShaderStage = other._bindingSrvShaderStage;
+        _isActive = other._isActive;
+        _isEditing = other._isEditing;
+        _allowAllTechniques = other._allowAllTechniques;
+        _isProvidingTextureBinding = other._isProvidingTextureBinding;
+        _copyTextureBinding = other._copyTextureBinding;
+        _extractConstants = other._extractConstants;
+        _extractResourceViews = other._extractResourceViews;
+        _clearBindings = other._clearBindings;
+        _previewClearAlpha = other._previewClearAlpha;
+        _hasTechniqueExceptions = other._hasTechniqueExceptions;
+        _tonemapHDRtoSDRtoHDR = other._tonemapHDRtoSDRtoHDR;
+        _preserveAlpha = other._preserveAlpha;
+        _flipBuffer = other._flipBuffer;
+        _flipBufferBinding = other._flipBufferBinding;
+        _matchSwapchainResolution = other._matchSwapchainResolution;
+        _bindingMatchSwapchainResolution = other._bindingMatchSwapchainResolution;
+        _requeueAfterRTMatchingFailure = other._requeueAfterRTMatchingFailure;
+        _cbModePush = other._cbModePush;
+        _textureBindingName = other._textureBindingName;
+        _preferredTechniques = other._preferredTechniques;
+        _varOffsetMapping = other._varOffsetMapping;
+        _cbCycle = other._cbCycle;
+        _srvCycle = other._srvCycle;
+        _rtCycle = other._rtCycle;
     }
 
 
@@ -69,6 +122,12 @@ namespace ShaderToggler
 
         ++s_groupId;
         return s_groupId;
+    }
+
+
+    GroupResource& ToggleGroup::GetGroupResource(GroupResourceType type)
+    {
+        return _group_buffers[static_cast<uint32_t>(type)];
     }
 
 

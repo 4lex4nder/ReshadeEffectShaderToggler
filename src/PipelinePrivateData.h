@@ -10,6 +10,7 @@
 #include "ToggleGroup.h"
 
 using effect_queue = std::unordered_map<std::string, std::tuple<ShaderToggler::ToggleGroup*, uint64_t, reshade::api::resource>>;
+using binding_queue = std::unordered_map<ShaderToggler::ToggleGroup*, std::tuple<uint64_t, reshade::api::resource>>;
 
 struct __declspec(novtable) EffectData final {
     constexpr EffectData() : rendered(false), enabled_in_screenshot(true), technique({}), timeout(-1) {}
@@ -45,7 +46,7 @@ struct __declspec(novtable) EffectData final {
 
 struct __declspec(novtable) ShaderData final {
     uint32_t activeShaderHash = -1;
-    effect_queue bindingsToUpdate;
+    binding_queue bindingsToUpdate;
     std::unordered_set<ShaderToggler::ToggleGroup*> constantBuffersToUpdate;
     effect_queue techniquesToRender;
     std::unordered_set<ShaderToggler::ToggleGroup*> srvToUpdate;
@@ -139,8 +140,7 @@ struct __declspec(uuid("C63E95B1-4E2F-46D6-A276-E8B4612C069A")) DeviceDataContai
     std::vector<std::pair<std::string, EffectData*>> allSortedTechniques;
     std::unordered_map<std::string, EffectData*> allEnabledTechniques;
     std::shared_mutex binding_mutex;
-    std::unordered_map<std::string, TextureBindingData> bindingMap;
-    std::unordered_set<std::string> bindingsUpdated;
+    std::unordered_set<const ShaderToggler::ToggleGroup*> bindingsUpdated;
     std::unordered_set<const ShaderToggler::ToggleGroup*> constantsUpdated;
     std::unordered_set<const ShaderToggler::ToggleGroup*> srvUpdated;
     bool reload_bindings = false;
