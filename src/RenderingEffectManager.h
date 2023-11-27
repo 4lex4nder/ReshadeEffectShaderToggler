@@ -14,6 +14,7 @@ namespace Rendering
 
         void RenderEffects(reshade::api::command_list* cmd_list, uint64_t callLocation = CALL_DRAW, uint64_t invocation = MATCH_NONE);
         bool RenderRemainingEffects(reshade::api::effect_runtime* runtime);
+        void PreventRuntimeReload(reshade::api::command_list* cmd_list);
     private:
         AddonImGui::AddonUIData& uiData;
         ResourceManager& resourceManager;

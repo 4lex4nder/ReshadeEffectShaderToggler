@@ -233,6 +233,8 @@ void AddonUIData::LoadShaderTogglerIniFile(const string& fileName)
         _constHookCopyType = "gpu_readback";
     }
 
+    _preventRuntimeReload = iniFile.GetBoolOrDefault("PreventRuntimeReload", "General", false);
+
     for (uint32_t i = 0; i < ARRAYSIZE(KeybindNames); i++)
     {
         uint32_t keybinding = iniFile.GetUInt(KeybindNames[i], "Keybindings");
@@ -295,6 +297,7 @@ void AddonUIData::SaveShaderTogglerIniFile(const string& fileName)
     iniFile.SetValue("ConstantBufferHookType", _constHookType, "", "General");
     iniFile.SetValue("ConstantBufferHookCopyType", _constHookCopyType, "", "General");
     iniFile.SetBool("TrackDescriptors", _trackDescriptors, "", "General");
+    iniFile.SetBool("PreventRuntimeReload", _preventRuntimeReload, "", "General");
 
     for (uint32_t i = 0; i < ARRAYSIZE(KeybindNames); i++)
     {

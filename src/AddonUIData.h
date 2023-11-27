@@ -112,6 +112,7 @@ namespace AddonImGui
         std::string _constHookCopyType = "gpu_readback";
         std::string _resourceShim = "none";
         bool _trackDescriptors = true;
+        bool _preventRuntimeReload = false;
         std::filesystem::path _basePath;
         TabType _currentTab = TabType::TAB_NONE;
 
@@ -165,5 +166,7 @@ namespace AddonImGui
         void SetTrackDescriptors(bool track) { _trackDescriptors = track; }
         void AddToggleGroupRemovalCallback(std::function<void(reshade::api::effect_runtime*, ShaderToggler::ToggleGroup*)> callback);
         void SignalToggleGroupRemoved(reshade::api::effect_runtime*, ShaderToggler::ToggleGroup*);
+        bool GetPreventRuntimeReload() const { return _preventRuntimeReload; }
+        void SetPreventRuntimeReload(bool reload) { _preventRuntimeReload = reload; }
     };
 }

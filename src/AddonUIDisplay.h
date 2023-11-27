@@ -1061,6 +1061,10 @@ static void DisplaySettings(AddonImGui::AddonUIData& instance, reshade::api::eff
         bool trackDescriptors = instance.GetTrackDescriptors();
         ImGui::Checkbox("Track descriptors", &trackDescriptors);
         instance.SetTrackDescriptors(trackDescriptors);
+
+        bool runtimeReload = instance.GetPreventRuntimeReload();
+        ImGui::Checkbox("Prevent runtime reload", &runtimeReload);
+        instance.SetPreventRuntimeReload(runtimeReload);
     }
 
     if (ImGui::CollapsingHeader("Keybindings", ImGuiTreeNodeFlags_None))

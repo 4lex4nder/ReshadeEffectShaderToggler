@@ -88,6 +88,17 @@ void ResourceManager::InitBackbuffer(swapchain* runtime)
         s_SRVs.emplace(backBuffer.handle, make_pair(srv_non_srgb, srv_srgb));
         s_sRGBResourceViews.emplace(backBuffer.handle, make_pair(backBufferView, backBufferViewSRGB));
     }
+
+    resource_desc dummy_desc = desc;
+    dummy_desc.texture.height = 1;
+    dummy_desc.texture.width = 1;
+    
+    bool resCreated = runtime->get_device()->create_resource(dummy_desc, nullptr, resource_usage::render_target, &dummy_res);
+
+    if (resCreated)
+    {
+        runtime->get_device()->create_resource_view(dummy_res, resource_usage::render_target, resource_view_desc{ desc.texture.format }, &dummy_rtv);
+    }
 }
 
 void ResourceManager::ClearBackbuffer(reshade::api::swapchain* runtime)
@@ -138,6 +149,18 @@ void ResourceManager::ClearBackbuffer(reshade::api::swapchain* runtime)
         _resourceViewRefCount.erase(backBuffer.handle);
         s_SRVs.erase(backBuffer.handle);
         s_sRGBResourceViews.erase(backBuffer.handle);
+    }
+
+    if (dummy_res != 0)
+    {
+        runtime->get_device()->destroy_resource(dummy_res);
+        dummy_res = { 0 };
+    }
+
+    if (dummy_rtv != 0)
+    {
+        runtime->get_device()->destroy_resource_view(dummy_rtv);
+        dummy_rtv = { 0 };
     }
 }
 

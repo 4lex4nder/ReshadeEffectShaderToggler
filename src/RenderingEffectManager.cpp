@@ -134,14 +134,14 @@ bool RenderingEffectManager::_RenderEffects(
             continue;
         }
 
-        if (group->getFlipBuffer() && deviceData.specialEffects.flip.technique != 0)
+        if (group->getFlipBuffer() && deviceData.specialEffects[REST_FLIP].technique != 0)
         {
-            runtime->render_technique(deviceData.specialEffects.flip.technique, cmd_list, view_non_srgb, view_srgb);
+            runtime->render_technique(deviceData.specialEffects[REST_FLIP].technique, cmd_list, view_non_srgb, view_srgb);
         }
 
-        if (group->getToneMap() && deviceData.specialEffects.tonemap_to_sdr.technique != 0)
+        if (group->getToneMap() && deviceData.specialEffects[REST_TONEMAP_TO_SDR].technique != 0)
         {
-            runtime->render_technique(deviceData.specialEffects.tonemap_to_sdr.technique, cmd_list, view_non_srgb, view_srgb);
+            runtime->render_technique(deviceData.specialEffects[REST_TONEMAP_TO_SDR].technique, cmd_list, view_non_srgb, view_srgb);
         }
 
         for (const auto& effectTech : effectList)
@@ -158,14 +158,14 @@ bool RenderingEffectManager::_RenderEffects(
             rendered = true;
         }
 
-        if (group->getToneMap() && deviceData.specialEffects.tonemap_to_hdr.technique != 0)
+        if (group->getToneMap() && deviceData.specialEffects[REST_TONEMAP_TO_HDR].technique != 0)
         {
-            runtime->render_technique(deviceData.specialEffects.tonemap_to_hdr.technique, cmd_list, view_non_srgb, view_srgb);
+            runtime->render_technique(deviceData.specialEffects[REST_TONEMAP_TO_HDR].technique, cmd_list, view_non_srgb, view_srgb);
         }
 
-        if (group->getFlipBuffer() && deviceData.specialEffects.flip.technique != 0)
+        if (group->getFlipBuffer() && deviceData.specialEffects[REST_FLIP].technique != 0)
         {
-            runtime->render_technique(deviceData.specialEffects.flip.technique, cmd_list, view_non_srgb, view_srgb);
+            runtime->render_technique(deviceData.specialEffects[REST_FLIP].technique, cmd_list, view_non_srgb, view_srgb);
         }
 
         if (copyPreserveAlpha)
@@ -229,7 +229,10 @@ void RenderingEffectManager::RenderEffects(command_list* cmd_list, uint64_t call
         return;
     }
 
-    deviceData.current_runtime->render_effects(cmd_list, resource_view{ 0 }, resource_view{ 0 });
+    if (!deviceData.rendered_effects)
+    {
+        deviceData.current_runtime->render_effects(cmd_list, resource_view{ 0 }, resource_view{ 0 });
+    }
 
     unique_lock<shared_mutex> dev_mutex(deviceData.render_mutex);
     rendered =
@@ -256,5 +259,26 @@ void RenderingEffectManager::RenderEffects(command_list* cmd_list, uint64_t call
     if (rendered)
     {
         cmd_list->get_private_data<state_tracking>().apply(cmd_list);
+    }
+}
+
+
+void RenderingEffectManager::PreventRuntimeReload(reshade::api::command_list* cmd_list)
+{
+    DeviceDataContainer& deviceData = cmd_list->get_device()->get_private_data<DeviceDataContainer>();
+
+    // cringe
+    if (deviceData.specialEffects[REST_NOOP].technique != 0)
+    {
+        resource res = deviceData.current_runtime->get_current_back_buffer();
+        resource_view active_rtv = { 0 };
+        resource_view active_rtv_srgb = { 0 };
+
+        resourceManager.SetResourceViewHandles(res.handle, &active_rtv, &active_rtv_srgb);
+
+        if (resourceManager.dummy_rtv != 0)
+            deviceData.current_runtime->render_technique(deviceData.specialEffects[REST_NOOP].technique, cmd_list, resourceManager.dummy_rtv, resourceManager.dummy_rtv);
+
+        deviceData.current_runtime->render_technique(deviceData.specialEffects[REST_NOOP].technique, cmd_list, active_rtv, active_rtv_srgb);
     }
 }

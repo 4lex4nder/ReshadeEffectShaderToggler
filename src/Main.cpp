@@ -553,6 +553,11 @@ static void onReshadePresent(effect_runtime* runtime)
 
     keyMonitor.PollKeyStates(runtime);
 
+    if (g_addonUIData.GetPreventRuntimeReload())
+    {
+        renderingEffectManager.PreventRuntimeReload(queue->get_immediate_command_list());
+    }
+
     techniqueManager.OnReshadePresent(runtime);
 
     deviceData.bindingsUpdated.clear();

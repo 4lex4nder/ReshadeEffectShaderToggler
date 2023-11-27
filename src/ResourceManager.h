@@ -60,6 +60,9 @@ namespace Rendering
         bool IsCompatibleWithPreviewFormat(reshade::api::effect_runtime* runtime, reshade::api::resource res);
 
         static EmbeddedResourceData GetResourceData(uint16_t id);
+
+        reshade::api::resource dummy_res;
+        reshade::api::resource_view dummy_rtv;
     private:
         void DisposeView(reshade::api::device* device, uint64_t handle);
         void CreateViews(reshade::api::device* device, reshade::api::resource res);

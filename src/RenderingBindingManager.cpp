@@ -221,6 +221,7 @@ void RenderingBindingManager::_UpdateTextureBindings(command_list* cmd_list,
                     bindingResource.target_description = resDesc;
                     bindingResource.srv = view_non_srgb;
                     bindingResource.owning = false;
+                    bindingResource.state = ShaderToggler::GroupResourceState::RESOURCE_VALID;
                 }
             }
             else
@@ -235,9 +236,9 @@ void RenderingBindingManager::_UpdateTextureBindings(command_list* cmd_list,
                 {
                     cmd_list->copy_resource(active_resource, target_res);
 
-                    if (group->getFlipBufferBinding() && bindingResource.rtv != 0 && deviceData.specialEffects.flip.technique != 0)
+                    if (group->getFlipBufferBinding() && bindingResource.rtv != 0 && deviceData.specialEffects[REST_FLIP].technique != 0)
                     {
-                        runtime->render_technique(deviceData.specialEffects.flip.technique, cmd_list, bindingResource.rtv, bindingResource.rtv_srgb);
+                        runtime->render_technique(deviceData.specialEffects[REST_FLIP].technique, cmd_list, bindingResource.rtv, bindingResource.rtv_srgb);
                     }
                 }
             }

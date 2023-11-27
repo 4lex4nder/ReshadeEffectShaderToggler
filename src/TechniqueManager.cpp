@@ -23,22 +23,21 @@ void TechniqueManager::OnReshadeReloadedEffects(reshade::api::effect_runtime* ru
     Rendering::RenderingManager::EnumerateTechniques(runtime, [&data, this](effect_runtime* runtime, effect_technique technique, string& name) {
         allTechniques.push_back(name);
         bool enabled = runtime->get_technique_state(technique);
-    
+
         // Assign technique handles to REST effects
-        if (name == data.specialEffects.tonemap_to_hdr.name)
+        bool builtin = false;
+        for (uint32_t j = 0; j < REST_EFFECTS_COUNT; j++)
         {
-            data.specialEffects.tonemap_to_hdr.technique = technique;
-            return;
-        }
-        if (name == data.specialEffects.tonemap_to_sdr.name)
-        {
-            data.specialEffects.tonemap_to_sdr.technique = technique;
-            return;
+            if (name == data.specialEffects[j].name)
+            {
+                data.specialEffects[j].technique = technique;
+                builtin = true;
+                break;
+            }
         }
 
-        if (name == data.specialEffects.flip.name)
+        if (builtin)
         {
-            data.specialEffects.flip.technique = technique;
             return;
         }
 
@@ -60,9 +59,12 @@ bool TechniqueManager::OnReshadeSetTechniqueState(reshade::api::effect_runtime* 
     string techName(charBuffer);
 
     // Prevent REST techniques from being manually enabled
-    if (techName == data.specialEffects.tonemap_to_hdr.name || techName == data.specialEffects.tonemap_to_sdr.name || techName == data.specialEffects.flip.name)
+    for (uint32_t j = 0; j < REST_EFFECTS_COUNT; j++)
     {
-        return true;
+        if (techName == data.specialEffects[j].name)
+        {
+            return true;
+        }
     }
 
     const auto& it = data.allTechniques.find(techName);
@@ -110,19 +112,19 @@ bool TechniqueManager::OnReshadeReorderTechniques(reshade::api::effect_runtime* 
         bool enabled = runtime->get_technique_state(technique);
 
         // Assign technique handles to REST effects
-        if (name == data.specialEffects.tonemap_to_hdr.name)
+        bool builtin = false;
+        for (uint32_t j = 0; j < REST_EFFECTS_COUNT; j++)
         {
-            data.specialEffects.tonemap_to_hdr.technique = technique;
-            continue;
+            if (name == data.specialEffects[j].name)
+            {
+                data.specialEffects[j].technique = technique;
+                builtin = true;
+                break;
+            }
         }
-        if (name == data.specialEffects.tonemap_to_sdr.name)
+
+        if (builtin)
         {
-            data.specialEffects.tonemap_to_sdr.technique = technique;
-            continue;
-        }
-        if (name == data.specialEffects.flip.name)
-        {
-            data.specialEffects.flip.technique = technique;
             continue;
         }
 
