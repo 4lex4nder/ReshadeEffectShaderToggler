@@ -192,7 +192,8 @@ void ResourceManager::OnDestroyResource(device* device, resource res)
 
     resource_desc desc = device->get_resource_desc(res);
 
-    if ((static_cast<uint32_t>(desc.usage) & static_cast<uint32_t>(resource_usage::render_target) || static_cast<uint32_t>(desc.usage) & static_cast<uint32_t>(resource_usage::shader_resource)) && desc.type == resource_type::texture_2d)
+    if ((static_cast<uint32_t>(desc.usage) & static_cast<uint32_t>(resource_usage::render_target) || static_cast<uint32_t>(desc.usage) & static_cast<uint32_t>(resource_usage::shader_resource)) &&
+        desc.type == resource_type::texture_2d && !in_destroy_device)
     {
         std::shared_lock<shared_mutex> lock_view(view_mutex);
 
@@ -207,12 +208,17 @@ void ResourceManager::OnDestroyResource(device* device, resource res)
 
 void ResourceManager::OnDestroyDevice(device* device)
 {
+    in_destroy_device = true;
+
     std::unique_lock<shared_mutex> lock_view(view_mutex);
     for (auto view = global_resources.begin(); view != global_resources.end();)
     {
         DisposeView(device, view->second);
         view = global_resources.erase(view);
     }
+    global_resources.clear();
+
+    in_destroy_device = false;
 }
 
 

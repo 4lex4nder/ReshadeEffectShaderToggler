@@ -93,6 +93,7 @@ namespace Rendering
 
         ResourceShimType _shimType = ResourceShimType::Resource_Shim_None;
         Shim::Resources::ResourceShim* rShim = nullptr;
+        bool in_destroy_device = false;
 
         //std::unordered_map<uint64_t, std::pair<reshade::api::resource_view, reshade::api::resource_view>> s_sRGBResourceViews;
         //std::unordered_map<uint64_t, std::pair<reshade::api::resource_view, reshade::api::resource_view>> s_SRVs;
