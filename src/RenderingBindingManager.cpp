@@ -199,10 +199,9 @@ void RenderingBindingManager::_UpdateTextureBindings(command_list* cmd_list,
 
             if (!bindingResource.enabled())
             {
-                resource_view view_non_srgb = { 0 };
-                resource_view view_srgb = { 0 };
-
-                resourceManager.SetShaderResourceViewHandles(active_resource.handle, &view_non_srgb, &view_srgb);
+                GlobalResourceView& view = resourceManager.GetResourceView(active_resource.handle);
+                resource_view view_non_srgb = view.srv;
+                resource_view view_srgb = view.rtv_srgb;
 
                 if (view_non_srgb == 0)
                 {

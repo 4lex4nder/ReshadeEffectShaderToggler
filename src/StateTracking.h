@@ -98,6 +98,7 @@ namespace StateTracking
         /// Removes all state in this state block.
         /// </summary>
         void clear();
+        void clear_present(reshade::api::effect_runtime* runtime);
 
         std::vector<reshade::api::resource_view> render_targets;
         reshade::api::resource_view depth_stencil = { 0 };

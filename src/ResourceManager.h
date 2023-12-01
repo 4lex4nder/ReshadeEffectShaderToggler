@@ -31,6 +31,28 @@ namespace Rendering
         size_t size;
     };
 
+    enum class GlobalResourceState : uint32_t
+    {
+        RESOURCE_UNINITIALIZED = 0,
+        RESOURCE_VALID = 1,
+        RESOURCE_USED = 2,
+        RESOURCE_INVALID = 3,
+    };
+
+    struct __declspec(novtable) GlobalResourceView final
+    {
+        constexpr GlobalResourceView() : resource_handle { 0 }, rtv { 0 }, rtv_srgb { 0 }, srv { 0 }, srv_srgb { 0 }, state(GlobalResourceState::RESOURCE_UNINITIALIZED) { }
+        constexpr GlobalResourceView(uint64_t handle) : resource_handle{ handle }, rtv{ 0 }, rtv_srgb{ 0 }, srv{ 0 }, srv_srgb{ 0 }, state(GlobalResourceState::RESOURCE_UNINITIALIZED) { }
+        constexpr GlobalResourceView(reshade::api::resource_desc desc) : resource_handle { 0 }, rtv { 0 }, rtv_srgb{ 0 }, srv{ 0 }, srv_srgb{ 0 }, state(GlobalResourceState::RESOURCE_UNINITIALIZED) { }
+
+        uint64_t resource_handle;
+        reshade::api::resource_view rtv;
+        reshade::api::resource_view rtv_srgb;
+        reshade::api::resource_view srv;
+        reshade::api::resource_view srv_srgb;
+        GlobalResourceState state;
+    };
+
     class __declspec(novtable) ResourceManager final
     {
     public:
@@ -48,8 +70,6 @@ namespace Rendering
         void OnDestroySwapchain(reshade::api::swapchain* swapchain);
         void OnDestroyDevice(reshade::api::device*);
 
-        void SetResourceViewHandles(uint64_t handle, reshade::api::resource_view* non_srgb_view, reshade::api::resource_view* srgb_view);
-        void SetShaderResourceViewHandles(uint64_t handle, reshade::api::resource_view* non_srgb_view, reshade::api::resource_view* srgb_view);
         void SetResourceShim(const std::string& shim) { _shimType = ResolveResourceShimType(shim); }
         void Init();
 
@@ -59,23 +79,26 @@ namespace Rendering
         void SetPongPreviewHandles(reshade::api::resource* res, reshade::api::resource_view* rtv, reshade::api::resource_view* srv);
         bool IsCompatibleWithPreviewFormat(reshade::api::effect_runtime* runtime, reshade::api::resource res);
 
+        GlobalResourceView& GetResourceView(uint64_t handle);
+        void CheckResourceViews(reshade::api::effect_runtime* runtime);
+
         static EmbeddedResourceData GetResourceData(uint16_t id);
 
         reshade::api::resource dummy_res;
         reshade::api::resource_view dummy_rtv;
     private:
-        void DisposeView(reshade::api::device* device, uint64_t handle);
-        void CreateViews(reshade::api::device* device, reshade::api::resource res);
+        void DisposeView(reshade::api::device* device, const GlobalResourceView& views);
+        void CreateViews(reshade::api::device* device, GlobalResourceView& gview);
         static ResourceShimType ResolveResourceShimType(const std::string&);
 
         ResourceShimType _shimType = ResourceShimType::Resource_Shim_None;
         Shim::Resources::ResourceShim* rShim = nullptr;
 
-        std::unordered_map<uint64_t, std::pair<reshade::api::resource_view, reshade::api::resource_view>> s_sRGBResourceViews;
-        std::unordered_map<uint64_t, std::pair<reshade::api::resource_view, reshade::api::resource_view>> s_SRVs;
-
-        std::unordered_map<uint64_t, uint32_t> _resourceViewRefCount;
-        std::unordered_map<uint64_t, uint64_t> _resourceViewToResource;
+        //std::unordered_map<uint64_t, std::pair<reshade::api::resource_view, reshade::api::resource_view>> s_sRGBResourceViews;
+        //std::unordered_map<uint64_t, std::pair<reshade::api::resource_view, reshade::api::resource_view>> s_SRVs;
+        //
+        //std::unordered_map<uint64_t, uint32_t> _resourceViewRefCount;
+        //std::unordered_map<uint64_t, uint64_t> _resourceViewToResource;
 
         std::shared_mutex resource_mutex;
         std::shared_mutex view_mutex;
@@ -83,5 +106,8 @@ namespace Rendering
         reshade::api::resource preview_res[2];
         reshade::api::resource_view preview_rtv[2];
         reshade::api::resource_view preview_srv[2];
+
+        std::unordered_map<uint64_t, GlobalResourceView> global_resources;
+        std::unordered_set<uint64_t> resources;
     };
 }

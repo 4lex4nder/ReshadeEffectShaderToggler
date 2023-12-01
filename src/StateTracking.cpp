@@ -199,6 +199,12 @@ void state_block::clear()
     resource_barrier_track.clear();
 }
 
+void state_block::clear_present(effect_runtime* runtime)
+{
+     render_targets.clear();
+     depth_stencil = { 0 };
+}
+
 static inline int32_t get_shader_stage_index(shader_stage stages)
 {
     const uint32_t stage_value = static_cast<uint32_t>(stages);
@@ -591,6 +597,15 @@ static void on_reset_command_list(command_list* cmd_list)
     state.clear();
 }
 
+static void on_reshade_present(effect_runtime* runtime)
+{
+    if (runtime->get_device()->get_api() != device_api::d3d12 && runtime->get_device()->get_api() != device_api::vulkan)
+    {
+        auto& state = runtime->get_command_queue()->get_immediate_command_list()->get_private_data<state_tracking>();
+        state.clear_present(runtime);
+    }
+}
+
 void state_block::start_resource_barrier_tracking(reshade::api::resource res, reshade::api::resource_usage current_usage)
 {
     const auto& restrack = resource_barrier_track.find(res.handle);
@@ -659,6 +674,7 @@ void state_tracking::register_events(bool track)
     reshade::register_event<reshade::addon_event::bind_viewports>(on_bind_viewports);
     reshade::register_event<reshade::addon_event::bind_scissor_rects>(on_bind_scissor_rects);
     reshade::register_event<reshade::addon_event::barrier>(on_barrier);
+    reshade::register_event<reshade::addon_event::reshade_present>(on_reshade_present);
 
     reshade::register_event<reshade::addon_event::push_descriptors>(on_push_descriptors);
     reshade::register_event<reshade::addon_event::push_constants>(on_push_constants);
@@ -687,6 +703,7 @@ void state_tracking::unregister_events()
     reshade::unregister_event<reshade::addon_event::bind_viewports>(on_bind_viewports);
     reshade::unregister_event<reshade::addon_event::bind_scissor_rects>(on_bind_scissor_rects);
     reshade::unregister_event<reshade::addon_event::barrier>(on_barrier);
+    reshade::unregister_event<reshade::addon_event::reshade_present>(on_reshade_present);
 
     reshade::unregister_event<reshade::addon_event::push_descriptors>(on_push_descriptors);
     reshade::unregister_event<reshade::addon_event::push_constants>(on_push_constants);

@@ -563,6 +563,7 @@ static void onReshadePresent(effect_runtime* runtime)
     deviceData.bindingsUpdated.clear();
     deviceData.constantsUpdated.clear();
     deviceData.huntPreview.Reset();
+    resourceManager.CheckResourceViews(runtime);
 
     if (deviceData.reload_bindings)
     {
