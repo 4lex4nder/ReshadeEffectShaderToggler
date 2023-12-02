@@ -155,7 +155,7 @@ static bool onCreateSwapchain(swapchain_desc& desc, void* hwnd)
 
 static void onInitSwapchain(reshade::api::swapchain* swapchain)
 {
-    //resourceManager.OnInitSwapchain(swapchain);
+    resourceManager.OnInitSwapchain(swapchain);
 }
 
 
@@ -246,7 +246,7 @@ static void onInitEffectRuntime(effect_runtime* runtime)
     DeviceDataContainer& data = runtime->get_device()->get_private_data<DeviceDataContainer>();
 
     keyMonitor.Init(runtime);
-    resourceManager.OnInitSwapchain(runtime);
+    //resourceManager.OnInitSwapchain(runtime);
     renderingShaderManager.InitShaders(runtime->get_device());
 
     // Dispose of texture bindings created from the runtime below
@@ -533,9 +533,6 @@ static void onPresent(command_queue* queue, swapchain* swapchain, const rect* so
         if (runtime->get_effects_state())
         {
             renderingEffectManager.RenderRemainingEffects(runtime);
-            resourceManager.CheckPreview(queue->get_immediate_command_list(), dev, runtime);
-            groupResourceManager.CheckGroupBuffers(runtime, g_addonUIData.GetToggleGroups());
-            renderingBindingManager.ClearUnmatchedTextureBindings(runtime->get_command_queue()->get_immediate_command_list());
         }
     }
 
@@ -563,7 +560,14 @@ static void onReshadePresent(effect_runtime* runtime)
     deviceData.bindingsUpdated.clear();
     deviceData.constantsUpdated.clear();
     deviceData.huntPreview.Reset();
-    resourceManager.CheckResourceViews(runtime);
+
+    if (runtime->get_effects_state())
+    {
+        resourceManager.CheckPreview(queue->get_immediate_command_list(), dev, runtime);
+        groupResourceManager.CheckGroupBuffers(runtime, g_addonUIData.GetToggleGroups());
+        renderingBindingManager.ClearUnmatchedTextureBindings(runtime->get_command_queue()->get_immediate_command_list());
+        resourceManager.CheckResourceViews(runtime);
+    }
 
     CheckHotkeys(g_addonUIData, runtime);
 }

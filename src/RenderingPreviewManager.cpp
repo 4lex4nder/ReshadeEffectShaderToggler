@@ -141,7 +141,7 @@ void RenderingPreviewManager::UpdatePreview(command_list* cmd_list, uint64_t cal
         }
         else
         {
-            bool supportsAlphaClear = device->get_api() == device_api::d3d9 || device->get_api() == device_api::d3d10 || device->get_api() == device_api::d3d11/* || device->get_api() == device_api::d3d12*/;
+            bool supportsAlphaClear = device->get_api() == device_api::d3d9 || device->get_api() == device_api::d3d10 || device->get_api() == device_api::d3d11 || device->get_api() == device_api::d3d12;
 
             resource previewResPing = resource{ 0 };
             resource previewResPong = resource{ 0 };
