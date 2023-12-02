@@ -555,12 +555,6 @@ static void onReshadePresent(effect_runtime* runtime)
         renderingEffectManager.PreventRuntimeReload(queue->get_immediate_command_list());
     }
 
-    techniqueManager.OnReshadePresent(runtime);
-
-    deviceData.bindingsUpdated.clear();
-    deviceData.constantsUpdated.clear();
-    deviceData.huntPreview.Reset();
-
     if (runtime->get_effects_state())
     {
         resourceManager.CheckPreview(queue->get_immediate_command_list(), dev, runtime);
@@ -568,6 +562,12 @@ static void onReshadePresent(effect_runtime* runtime)
         renderingBindingManager.ClearUnmatchedTextureBindings(runtime->get_command_queue()->get_immediate_command_list());
         resourceManager.CheckResourceViews(runtime);
     }
+
+    techniqueManager.OnReshadePresent(runtime);
+
+    deviceData.bindingsUpdated.clear();
+    deviceData.constantsUpdated.clear();
+    deviceData.huntPreview.Reset();
 
     CheckHotkeys(g_addonUIData, runtime);
 }

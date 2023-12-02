@@ -301,8 +301,16 @@ void ResourceManager::CheckResourceViews(reshade::api::effect_runtime* runtime)
         // valid but not used or just invalid, dispose
         if (view->second.state == GlobalResourceState::RESOURCE_VALID || view->second.state == GlobalResourceState::RESOURCE_INVALID)
         {
-            DisposeView(runtime->get_device(), view->second);
-            view = global_resources.erase(view);
+            if (view->second.state == GlobalResourceState::RESOURCE_INVALID || view->second.ttl == 0)
+            {
+                DisposeView(runtime->get_device(), view->second);
+                view = global_resources.erase(view);
+            }
+            else
+            {
+                view->second.ttl--;
+                view++;
+            }
             continue;
         }
 
@@ -313,6 +321,12 @@ void ResourceManager::CheckResourceViews(reshade::api::effect_runtime* runtime)
             view->second.state = GlobalResourceState::RESOURCE_VALID;
         }
 
+        if (view->second.state == GlobalResourceState::RESOURCE_USED)
+        {
+            view->second.state = GlobalResourceState::RESOURCE_VALID;
+        }
+
+        view->second.ttl = GLOBAL_RESOURCE_TTL;
         view++;
     }
 }
