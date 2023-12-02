@@ -599,11 +599,6 @@ static void DisplayTextureBindings(AddonImGui::AddonUIData& instance, ShaderTogg
             ImGui::TableNextRow();
 
             ImGui::TableNextColumn();
-            if (ImGui::Button("Apply"))
-            {
-                deviceData.reload_bindings = true;
-            }
-            ImGui::TableNextColumn();
 
             ImGui::EndTable();
         }

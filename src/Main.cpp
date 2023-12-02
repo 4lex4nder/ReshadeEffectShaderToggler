@@ -565,14 +565,6 @@ static void onReshadePresent(effect_runtime* runtime)
     deviceData.huntPreview.Reset();
     resourceManager.CheckResourceViews(runtime);
 
-    if (deviceData.reload_bindings)
-    {
-        renderingBindingManager.DisposeTextureBindings(runtime);
-        renderingBindingManager.InitTextureBingings(runtime);
-
-        deviceData.reload_bindings = false;
-    }
-
     CheckHotkeys(g_addonUIData, runtime);
 }
 

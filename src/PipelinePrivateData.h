@@ -145,7 +145,6 @@ struct __declspec(uuid("C63E95B1-4E2F-46D6-A276-E8B4612C069A")) DeviceDataContai
     std::unordered_set<const ShaderToggler::ToggleGroup*> bindingsUpdated;
     std::unordered_set<const ShaderToggler::ToggleGroup*> constantsUpdated;
     std::unordered_set<const ShaderToggler::ToggleGroup*> srvUpdated;
-    bool reload_bindings = false;
     HuntPreview huntPreview;
     SpecialEffect specialEffects[4] = {
         SpecialEffect{ "REST_TONEMAP_TO_SDR", reshade::api::effect_technique {0} },
