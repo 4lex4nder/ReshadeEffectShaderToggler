@@ -26,7 +26,6 @@ bool RenderingEffectManager::RenderRemainingEffects(effect_runtime* runtime)
     command_list* cmd_list = runtime->get_command_queue()->get_immediate_command_list();
     device* device = runtime->get_device();
     RuntimeDataContainer& runtimeData = runtime->get_private_data<RuntimeDataContainer>();
-    CommandListDataContainer& commandListData = cmd_list->get_private_data<CommandListDataContainer>();
     DeviceDataContainer& deviceData = device->get_private_data<DeviceDataContainer>();
     bool rendered = false;
 
@@ -40,15 +39,16 @@ bool RenderingEffectManager::RenderRemainingEffects(effect_runtime* runtime)
         return false;
     }
 
-    RenderingManager::EnumerateTechniques(runtime, [&runtimeData, &cmd_list, &active_rtv, &active_rtv_srgb, &rendered](effect_runtime* runtime, effect_technique technique, string& name) {
-        if (runtimeData.allEnabledTechniques.contains(name) && !runtimeData.allEnabledTechniques[name]->rendered)
+    for (auto& eff : runtimeData.allEnabledTechniques)
+    {
+        if (!eff.second->rendered)
         {
-            runtime->render_technique(technique, cmd_list, active_rtv, active_rtv_srgb);
+            runtime->render_technique(eff.second->technique, cmd_list, active_rtv, active_rtv_srgb);
 
-            runtimeData.allEnabledTechniques[name]->rendered = true;
+            eff.second->rendered = true;
             rendered = true;
         }
-        });
+    }
 
     return rendered;
 }
@@ -57,21 +57,21 @@ bool RenderingEffectManager::_RenderEffects(
     command_list* cmd_list,
     DeviceDataContainer& deviceData,
     RuntimeDataContainer& runtimeData,
-    const unordered_map<string, tuple<ToggleGroup*, uint64_t, resource>>& techniquesToRender,
-    vector<string>& removalList,
-    const unordered_set<string>& toRenderNames)
+    const unordered_map<EffectData*, tuple<ToggleGroup*, uint64_t, resource>>& techniquesToRender,
+    vector<EffectData*>& removalList,
+    const unordered_set<EffectData*>& toRenderNames)
 {
     bool rendered = false;
     CommandListDataContainer& cmdData = cmd_list->get_private_data<CommandListDataContainer>();
     effect_runtime* runtime = deviceData.current_runtime;
 
-    unordered_map<ToggleGroup*, pair<vector<pair<string, EffectData*>>, resource>> groupTechMap;
+    unordered_map<ToggleGroup*, pair<vector<EffectData*>, resource>> groupTechMap;
 
-    for (const auto& sTech : runtimeData.allSortedTechniques)
+    for (const auto& sTech : runtimeData.allEnabledTechniques)
     {
-        if (sTech.second->enabled && !sTech.second->rendered && toRenderNames.contains(sTech.first))
+        if (sTech.second->enabled && !sTech.second->rendered && toRenderNames.contains(sTech.second))
         {
-            const auto& tech = techniquesToRender.find(sTech.first);
+            const auto& tech = techniquesToRender.find(sTech.second);
 
             if (tech != techniquesToRender.end())
             {
@@ -82,12 +82,12 @@ bool RenderingEffectManager::_RenderEffects(
 
                 if (curTechEntry == groupTechMap.end())
                 {
-                    const auto& nEntry = groupTechMap.emplace(group, make_pair(vector<pair<string, EffectData*>>(), active_resource));
-                    nEntry.first->second.first.push_back(make_pair(techName, sTech.second));
+                    const auto& nEntry = groupTechMap.emplace(group, make_pair(vector<EffectData*>(), active_resource));
+                    nEntry.first->second.first.push_back(sTech.second);
                 }
                 else
                 {
-                    curTechEntry->second.first.push_back(make_pair(techName, sTech.second));
+                    curTechEntry->second.first.push_back(sTech.second);
                 }
             }
         }
@@ -152,14 +152,12 @@ bool RenderingEffectManager::_RenderEffects(
 
         for (const auto& effectTech : effectList)
         {
-            const auto& [name, effectData] = effectTech;
-
             deviceData.rendered_effects = true;
 
-            runtime->render_technique(effectData->technique, cmd_list, view_non_srgb, view_srgb);
-            effectData->rendered = true;
+            runtime->render_technique(effectTech->technique, cmd_list, view_non_srgb, view_srgb);
+            effectTech->rendered = true;
 
-            removalList.push_back(name);
+            removalList.push_back(effectTech);
 
             rendered = true;
         }
@@ -201,15 +199,17 @@ void RenderingEffectManager::RenderEffects(command_list* cmd_list, uint64_t call
     // Remove call location from queue
     commandListData.commandQueue &= ~(invocation << (callLocation * MATCH_DELIMITER));
 
+    unique_lock<shared_mutex> renderLock(deviceData.render_mutex);
+
     if (deviceData.current_runtime == nullptr || (commandListData.ps.techniquesToRender.size() == 0 && commandListData.vs.techniquesToRender.size() == 0 && commandListData.cs.techniquesToRender.size() == 0)) {
         return;
     }
 
     RuntimeDataContainer& runtimeData = deviceData.current_runtime->get_private_data<RuntimeDataContainer>();
     bool toRender = false;
-    unordered_set<string> psToRenderNames;
-    unordered_set<string> vsToRenderNames;
-    unordered_set<string> csToRenderNames;
+    unordered_set<EffectData*> psToRenderNames;
+    unordered_set<EffectData*> vsToRenderNames;
+    unordered_set<EffectData*> csToRenderNames;
 
     if (invocation & MATCH_EFFECT_PS)
     {
@@ -227,9 +227,9 @@ void RenderingEffectManager::RenderEffects(command_list* cmd_list, uint64_t call
     }
 
     bool rendered = false;
-    vector<string> psRemovalList;
-    vector<string> vsRemovalList;
-    vector<string> csRemovalList;
+    vector<EffectData*> psRemovalList;
+    vector<EffectData*> vsRemovalList;
+    vector<EffectData*> csRemovalList;
 
     if (psToRenderNames.size() == 0 && vsToRenderNames.size() == 0)
     {
@@ -241,12 +241,12 @@ void RenderingEffectManager::RenderEffects(command_list* cmd_list, uint64_t call
         deviceData.current_runtime->render_effects(cmd_list, resource_view{ 0 }, resource_view{ 0 });
     }
 
-    unique_lock<shared_mutex> dev_mutex(runtimeData.render_mutex);
+    shared_lock<shared_mutex> techLock(runtimeData.technique_mutex);
     rendered =
         (psToRenderNames.size() > 0) && _RenderEffects(cmd_list, deviceData, runtimeData, commandListData.ps.techniquesToRender, psRemovalList, psToRenderNames) ||
         (vsToRenderNames.size() > 0) && _RenderEffects(cmd_list, deviceData, runtimeData, commandListData.vs.techniquesToRender, vsRemovalList, vsToRenderNames) ||
         (csToRenderNames.size() > 0) && _RenderEffects(cmd_list, deviceData, runtimeData, commandListData.cs.techniquesToRender, csRemovalList, csToRenderNames);
-    dev_mutex.unlock();
+    techLock.unlock();
 
     for (auto& g : psRemovalList)
     {

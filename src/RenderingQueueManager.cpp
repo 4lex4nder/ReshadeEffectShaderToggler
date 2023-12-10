@@ -78,25 +78,23 @@ void RenderingQueueManager::_CheckCallForCommandList(ShaderData& sData, CommandL
 
                         if (!techData->rendered)
                         {
-                            if (!sData.techniquesToRender.contains(techName))
+                            if (!sData.techniquesToRender.contains(techData))
                             {
-                                sData.techniquesToRender.emplace(techName, std::make_tuple(group, group->getInvocationLocation(), resource{ 0 }));
+                                sData.techniquesToRender.emplace(techData, std::make_tuple(group, group->getInvocationLocation(), resource{ 0 }));
                                 queue_mask |= (match_effect << (group->getInvocationLocation() * MATCH_DELIMITER)) | (match_effect << (CALL_DRAW * MATCH_DELIMITER));
                             }
                         }
                     }
                 }
                 else if (group->preferredTechniques().size() > 0) {
-                    for (auto& techName : group->preferredTechniques())
+                    auto& preferred = group->GetPreferredTechniqueData();
+
+                    for (auto& eff : preferred)
                     {
-                        const auto& techData = runtimeData.allEnabledTechniques.find(techName);
-                        if (techData != runtimeData.allEnabledTechniques.end() && !techData->second->rendered)
+                        if (!eff->rendered && !sData.techniquesToRender.contains(eff))
                         {
-                            if (!sData.techniquesToRender.contains(techName))
-                            {
-                                sData.techniquesToRender.emplace(techName, std::make_tuple(group, group->getInvocationLocation(), resource{ 0 }));
-                                queue_mask |= (match_effect << (group->getInvocationLocation() * MATCH_DELIMITER)) | (match_effect << (CALL_DRAW * MATCH_DELIMITER));
-                            }
+                            sData.techniquesToRender.emplace(eff, std::make_tuple(group, group->getInvocationLocation(), resource{ 0 }));
+                            queue_mask |= (match_effect << (group->getInvocationLocation() * MATCH_DELIMITER)) | (match_effect << (CALL_DRAW * MATCH_DELIMITER));
                         }
                     }
                 }
@@ -118,8 +116,9 @@ void RenderingQueueManager::CheckCallForCommandList(reshade::api::command_list* 
     DeviceDataContainer& deviceData = commandList->get_device()->get_private_data<DeviceDataContainer>();
     RuntimeDataContainer& runtimeData = deviceData.current_runtime->get_private_data<RuntimeDataContainer>();
 
-    shared_lock<shared_mutex> r_mutex(runtimeData.render_mutex);
-    shared_lock<shared_mutex> b_mutex(deviceData.binding_mutex);
+    shared_lock<shared_mutex> t_mutex(runtimeData.technique_mutex);
+    unique_lock<shared_mutex> b_mutex(deviceData.binding_mutex);
+    unique_lock<shared_mutex> r_mutex(deviceData.render_mutex);
 
     _CheckCallForCommandList(commandListData.ps, commandListData, deviceData, runtimeData);
     _CheckCallForCommandList(commandListData.vs, commandListData, deviceData, runtimeData);

@@ -41,12 +41,13 @@ void TechniqueManager::SignalEffectsReloaded(reshade::api::effect_runtime* runti
 void TechniqueManager::OnReshadeReloadedEffects(reshade::api::effect_runtime* runtime)
 {
     RuntimeDataContainer& data = runtime->get_private_data<RuntimeDataContainer>();
+    unique_lock<shared_mutex> lock(data.technique_mutex);
+
     data.allEnabledTechniques.clear();
-    data.allSortedTechniques.clear();
     data.allTechniques.clear();
     allTechniques.clear();
 
-    Rendering::RenderingManager::EnumerateTechniques(runtime, [&data, this](effect_runtime* runtime, effect_technique technique, string& name) {
+    Rendering::RenderingManager::EnumerateTechniques(runtime, [&data, this](effect_runtime* runtime, effect_technique technique, string& name, string& eff_name) {
         allTechniques.push_back(name);
         bool enabled = runtime->get_technique_state(technique);
 
@@ -67,8 +68,7 @@ void TechniqueManager::OnReshadeReloadedEffects(reshade::api::effect_runtime* ru
             return;
         }
 
-        const auto& it = data.allTechniques.emplace(name, EffectData{ technique, runtime, enabled });
-        data.allSortedTechniques.push_back(make_pair(name, &it.first->second));
+        const auto& it = data.allTechniques.emplace(name, EffectData{ technique, runtime, enabled, name, eff_name });
     
         if (enabled)
         {
@@ -93,6 +93,7 @@ void TechniqueManager::OnReshadeReloadedEffects(reshade::api::effect_runtime* ru
 bool TechniqueManager::OnReshadeSetTechniqueState(reshade::api::effect_runtime* runtime, reshade::api::effect_technique technique, bool enabled)
 {
     RuntimeDataContainer& data = runtime->get_private_data<RuntimeDataContainer>();
+    unique_lock<shared_mutex> lock(data.technique_mutex);
 
     charBufferSize = CHAR_BUFFER_SIZE;
     runtime->get_technique_name(technique, charBuffer, &charBufferSize);
@@ -137,7 +138,8 @@ bool TechniqueManager::OnReshadeSetTechniqueState(reshade::api::effect_runtime* 
 bool TechniqueManager::OnReshadeReorderTechniques(reshade::api::effect_runtime* runtime, size_t count, reshade::api::effect_technique* techniques)
 {
     RuntimeDataContainer& data = runtime->get_private_data<RuntimeDataContainer>();
-    data.allSortedTechniques.clear();
+    unique_lock<shared_mutex> lock(data.technique_mutex);
+
     data.allEnabledTechniques.clear();
     data.allTechniques.clear();
 
@@ -148,6 +150,10 @@ bool TechniqueManager::OnReshadeReorderTechniques(reshade::api::effect_runtime* 
         charBufferSize = CHAR_BUFFER_SIZE;
         runtime->get_technique_name(technique, charBuffer, &charBufferSize);
         string name(charBuffer);
+
+        charBufferSize = CHAR_BUFFER_SIZE;
+        runtime->get_technique_effect_name(technique, charBuffer, &charBufferSize);
+        string eff_name(charBuffer);
 
         bool enabled = runtime->get_technique_state(technique);
 
@@ -168,8 +174,7 @@ bool TechniqueManager::OnReshadeReorderTechniques(reshade::api::effect_runtime* 
             continue;
         }
 
-        const auto& it = data.allTechniques.emplace(name, EffectData{ technique, runtime, enabled });
-        data.allSortedTechniques.push_back(make_pair(name, &it.first->second));
+        const auto& it = data.allTechniques.emplace(name, EffectData{ technique, runtime, enabled, name, eff_name });
 
         if (enabled)
         {
@@ -183,6 +188,7 @@ bool TechniqueManager::OnReshadeReorderTechniques(reshade::api::effect_runtime* 
 void TechniqueManager::OnReshadePresent(reshade::api::effect_runtime* runtime)
 {
     RuntimeDataContainer& deviceData = runtime->get_private_data<RuntimeDataContainer>();
+    unique_lock<shared_mutex> lock(deviceData.technique_mutex);
 
     for (auto el = deviceData.allEnabledTechniques.begin(); el != deviceData.allEnabledTechniques.end();)
     {

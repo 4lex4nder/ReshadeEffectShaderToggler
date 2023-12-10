@@ -213,9 +213,16 @@ static void onDestroyResourceView(device* device, resource_view view)
 
 static void onReshadeReloadedEffects(effect_runtime* runtime)
 {
-    RuntimeDataContainer& data = runtime->get_private_data<RuntimeDataContainer>();
+    RuntimeDataContainer& runtimeData = runtime->get_private_data<RuntimeDataContainer>();
+    DeviceDataContainer& deviceData = runtime->get_device()->get_private_data<DeviceDataContainer>();
     
     techniqueManager.OnReshadeReloadedEffects(runtime);
+
+    if (deviceData.current_runtime == runtime)
+    {
+        unique_lock<shared_mutex> techLock(runtimeData.technique_mutex);
+        g_addonUIData.AssignPreferredGroupTechniques(runtimeData.allTechniques);
+    }
 }
 
 
@@ -231,7 +238,18 @@ static bool onReshadeSetTechniqueState(effect_runtime* runtime, effect_technique
 
 static bool onReshadeReorderTechniques(effect_runtime* runtime, size_t count, effect_technique* techniques)
 {
-    return techniqueManager.OnReshadeReorderTechniques(runtime, count, techniques);
+    RuntimeDataContainer& runtimeData = runtime->get_private_data<RuntimeDataContainer>();
+    DeviceDataContainer& deviceData = runtime->get_device()->get_private_data<DeviceDataContainer>();
+
+    bool ret = techniqueManager.OnReshadeReorderTechniques(runtime, count, techniques);
+
+    if (deviceData.current_runtime == runtime)
+    {
+        unique_lock<shared_mutex> techLock(runtimeData.technique_mutex);
+        g_addonUIData.AssignPreferredGroupTechniques(runtimeData.allTechniques);
+    }
+
+    return ret;
 }
 
 

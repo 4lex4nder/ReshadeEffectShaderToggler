@@ -109,10 +109,32 @@ namespace ShaderToggler
         _cbModePush = other._cbModePush;
         _textureBindingName = other._textureBindingName;
         _preferredTechniques = other._preferredTechniques;
+        _preferredTechniqueData = other._preferredTechniqueData;
         _varOffsetMapping = other._varOffsetMapping;
         _cbCycle = other._cbCycle;
         _srvCycle = other._srvCycle;
         _rtCycle = other._rtCycle;
+    }
+
+
+    void ToggleGroup::AssignPreferredTechniqueData(std::unordered_map<std::string, EffectData>& allTechniques)
+    {
+        _preferredTechniqueData.clear();
+
+        for (auto& techName : _preferredTechniques)
+        {
+            const auto& techData = allTechniques.find(techName);
+            if (techData != allTechniques.end())
+            {
+                _preferredTechniqueData.push_back(&techData->second);
+            }
+        }
+    }
+
+
+    const std::vector<EffectData*>& ToggleGroup::GetPreferredTechniqueData()
+    {
+        return _preferredTechniqueData;
     }
 
 

@@ -84,6 +84,14 @@ void AddonUIData::SignalToggleGroupRemoved(reshade::api::effect_runtime* runtime
     }
 }
 
+void AddonUIData::AssignPreferredGroupTechniques(std::unordered_map<std::string, EffectData>& allTechniques)
+{
+    for (auto& it : _toggleGroups)
+    {
+        it.second.AssignPreferredTechniqueData(allTechniques);
+    }
+}
+
 const vector<ToggleGroup*>* AddonUIData::GetToggleGroupsForPixelShaderHash(uint32_t hash)
 {
     const auto& it = _pixelShaderHashToToggleGroups.find(hash);

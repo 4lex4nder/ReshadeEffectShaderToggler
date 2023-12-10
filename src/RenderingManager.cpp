@@ -10,13 +10,18 @@ using namespace std;
 size_t RenderingManager::g_charBufferSize = CHAR_BUFFER_SIZE;
 char RenderingManager::g_charBuffer[CHAR_BUFFER_SIZE];
 
-void RenderingManager::EnumerateTechniques(effect_runtime* runtime, function<void(effect_runtime*, effect_technique, string&)> func)
+void RenderingManager::EnumerateTechniques(effect_runtime* runtime, function<void(effect_runtime*, effect_technique, string&, string&)> func)
 {
     runtime->enumerate_techniques(nullptr, [func](effect_runtime* rt, effect_technique technique) {
         g_charBufferSize = CHAR_BUFFER_SIZE;
         rt->get_technique_name(technique, g_charBuffer, &g_charBufferSize);
         string name(g_charBuffer);
-        func(rt, technique, name);
+
+        g_charBufferSize = CHAR_BUFFER_SIZE;
+        rt->get_technique_effect_name(technique, g_charBuffer, &g_charBufferSize);
+        string eff_name(g_charBuffer);
+
+        func(rt, technique, name, eff_name);
         });
 }
 
@@ -215,8 +220,8 @@ void RenderingManager::QueueOrDequeue(
     command_list* cmd_list,
     DeviceDataContainer& deviceData,
     CommandListDataContainer& commandListData,
-    unordered_map<string, tuple<ShaderToggler::ToggleGroup*, uint64_t, reshade::api::resource>>& queue,
-    unordered_set<string>& immediateQueue,
+    unordered_map<EffectData*, tuple<ShaderToggler::ToggleGroup*, uint64_t, reshade::api::resource>>& queue,
+    unordered_set<EffectData*>& immediateQueue,
     uint64_t callLocation,
     uint32_t layoutIndex,
     uint64_t action)

@@ -200,6 +200,7 @@
     <ClInclude Include="ConstantManager.h" />
     <ClInclude Include="crc32_hash.hpp" />
     <ClInclude Include="DescriptorTracking.h" />
+    <ClInclude Include="EffectData.h" />
     <ClInclude Include="GameHookT.h" />
     <ClInclude Include="KeyMonitor.h" />
     <ClInclude Include="RenderingBindingManager.h" />

@@ -39,6 +39,7 @@
 
 #include "reshade.hpp"
 #include "CDataFile.h"
+#include "EffectData.h"
 
 namespace ShaderToggler
 {
@@ -225,6 +226,8 @@ namespace ShaderToggler
         bool AlphaClear() { return false; }
         bool BindingEnabled() { return _isProvidingTextureBinding && _copyTextureBinding; }
         bool BindingClear() { return _clearBindings; }
+        void AssignPreferredTechniqueData(std::unordered_map<std::string, EffectData>& allTechniques);
+        const std::vector<EffectData*>& GetPreferredTechniqueData();
 
     private:
         int _id;
@@ -263,6 +266,7 @@ namespace ShaderToggler
         bool _cbModePush = false;
         std::string _textureBindingName;
         std::unordered_set<std::string> _preferredTechniques;
+        std::vector<EffectData*> _preferredTechniqueData;
         std::unordered_map<std::string, std::tuple<uintptr_t, bool>> _varOffsetMapping;
         DescriptorCycle _cbCycle;
         DescriptorCycle _srvCycle;

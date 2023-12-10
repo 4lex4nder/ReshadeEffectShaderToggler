@@ -99,12 +99,14 @@ static void DisplayIsPartOfToggleGroup()
 }
 
 
-static void DisplayTechniqueSelection(AddonImGui::AddonUIData& instance, ShaderToggler::ToggleGroup* group, float tblWidth = 0)
+static void DisplayTechniqueSelection(reshade::api::effect_runtime* runtime, AddonImGui::AddonUIData& instance, ShaderToggler::ToggleGroup* group, float tblWidth = 0)
 {
     if (group == nullptr)
     {
         return;
     }
+
+    RuntimeDataContainer& runtimeData = runtime->get_private_data<RuntimeDataContainer>();
 
     const std::vector<std::string>* techniquesPtr = instance.GetAllTechniques();
     std::unordered_set<std::string> curTechniques = group->preferredTechniques();
@@ -198,8 +200,13 @@ static void DisplayTechniqueSelection(AddonImGui::AddonUIData& instance, ShaderT
     group->setHasTechniqueExceptions(exceptions);
     group->setAllowAllTechniques(allowAll);
 
-    if(techniquesPtr != nullptr && techniquesPtr->size() > 0)
+    if (techniquesPtr != nullptr && techniquesPtr->size() > 0)
+    {
         group->setPreferredTechniques(newTechniques);
+
+        std::unique_lock<std::shared_mutex> techLock(runtimeData.technique_mutex);
+        instance.AssignPreferredGroupTechniques(runtimeData.allTechniques);
+    }
 }
 
 static void DrawPreview(unsigned long long textureId, uint32_t srcWidth, uint32_t srcHeight)
@@ -421,7 +428,7 @@ static void DisplayRenderTargets(AddonImGui::AddonUIData& instance, Rendering::R
 
         ImGui::Separator();
 
-        DisplayTechniqueSelection(instance, group, ImGui::GetWindowWidth() / 3);
+        DisplayTechniqueSelection(runtime, instance, group, ImGui::GetWindowWidth() / 3);
 
         ImGui::PopStyleVar();
     }

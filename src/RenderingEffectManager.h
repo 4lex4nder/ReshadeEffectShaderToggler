@@ -25,8 +25,8 @@ namespace Rendering
             reshade::api::command_list* cmd_list,
             DeviceDataContainer& deviceData,
             RuntimeDataContainer& runtimeData,
-            const std::unordered_map<std::string, std::tuple<ShaderToggler::ToggleGroup*, uint64_t, reshade::api::resource>>& techniquesToRender,
-            std::vector<std::string>& removalList,
-            const std::unordered_set<std::string>& toRenderNames);
+            const std::unordered_map<EffectData*, std::tuple<ShaderToggler::ToggleGroup*, uint64_t, reshade::api::resource>>& techniquesToRender,
+            std::vector<EffectData*>& removalList,
+            const std::unordered_set<EffectData*>& toRenderNames);
     };
 }

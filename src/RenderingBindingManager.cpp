@@ -271,6 +271,8 @@ void RenderingBindingManager::UpdateTextureBindings(command_list* cmd_list, uint
     // Remove call location from queue
     commandListData.commandQueue &= ~(invocation << (callLocation * MATCH_DELIMITER));
 
+    unique_lock<shared_mutex> mtx(deviceData.binding_mutex);
+
     if (deviceData.current_runtime == nullptr || (commandListData.ps.bindingsToUpdate.size() == 0 && commandListData.vs.bindingsToUpdate.size() == 0 && commandListData.cs.bindingsToUpdate.size() == 0)) {
         return;
     }
@@ -303,7 +305,6 @@ void RenderingBindingManager::UpdateTextureBindings(command_list* cmd_list, uint
     vector<ToggleGroup*> vsRemovalList;
     vector<ToggleGroup*> csRemovalList;
 
-    unique_lock<shared_mutex> mtx(deviceData.binding_mutex);
     if (psToUpdateBindings.size() > 0)
     {
         _UpdateTextureBindings(cmd_list, deviceData, commandListData.ps.bindingsToUpdate, psRemovalList, psToUpdateBindings);
