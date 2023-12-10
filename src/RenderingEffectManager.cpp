@@ -67,29 +67,17 @@ bool RenderingEffectManager::_RenderEffects(
 
     unordered_map<ToggleGroup*, pair<vector<EffectData*>, resource>> groupTechMap;
 
-    for (const auto& sTech : runtimeData.allEnabledTechniques)
+    for (const auto& sTech : techniquesToRender)
     {
-        if (sTech.second->enabled && !sTech.second->rendered && toRenderNames.contains(sTech.second))
+        if (sTech.first->enabled && !sTech.first->rendered && toRenderNames.contains(sTech.first))
         {
-            const auto& tech = techniquesToRender.find(sTech.second);
+            const auto& [techName, techData] = sTech;
+            const auto& [group, _, active_resource] = techData;
 
-            if (tech != techniquesToRender.end())
-            {
-                const auto& [techName, techData] = *tech;
-                const auto& [group, _, active_resource] = techData;
+            auto& [gEffects, gResource] = groupTechMap[group];
 
-                const auto& curTechEntry = groupTechMap.find(group);
-
-                if (curTechEntry == groupTechMap.end())
-                {
-                    const auto& nEntry = groupTechMap.emplace(group, make_pair(vector<EffectData*>(), active_resource));
-                    nEntry.first->second.first.push_back(sTech.second);
-                }
-                else
-                {
-                    curTechEntry->second.first.push_back(sTech.second);
-                }
-            }
+            gEffects.push_back(sTech.first);
+            gResource = active_resource;
         }
     }
 
