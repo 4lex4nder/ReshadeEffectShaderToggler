@@ -237,7 +237,7 @@ void ResourceManager::OnDestroyResourceView(device* device, resource_view view)
 {
 }
 
-GlobalResourceView& ResourceManager::GetResourceView(uint64_t handle)
+GlobalResourceView& ResourceManager::GetResourceView(device* device, uint64_t handle)
 {
     static GlobalResourceView emptyView{ 0 };
     if (handle == 0)
@@ -253,8 +253,17 @@ GlobalResourceView& ResourceManager::GetResourceView(uint64_t handle)
         return emptyView;
     }
 
+    // unitialized
+    if (res.state == GlobalResourceState::RESOURCE_UNINITIALIZED)
+    {
+        res.resource_handle = handle;
+        CreateViews(device, res);
+        res.state = GlobalResourceState::RESOURCE_VALID;
+    }
+
     if (res.state == GlobalResourceState::RESOURCE_VALID)
         res.state = GlobalResourceState::RESOURCE_USED;
+
 
     return res;
 }
@@ -305,27 +314,11 @@ void ResourceManager::CheckResourceViews(reshade::api::effect_runtime* runtime)
     for (auto view = global_resources.begin(); view != global_resources.end();)
     {
         // valid but not used or just invalid, dispose
-        if (view->second.state == GlobalResourceState::RESOURCE_VALID || view->second.state == GlobalResourceState::RESOURCE_INVALID)
+        if (!effects_reloading && (view->second.state == GlobalResourceState::RESOURCE_VALID || view->second.state == GlobalResourceState::RESOURCE_INVALID))
         {
-            if (view->second.state == GlobalResourceState::RESOURCE_INVALID || view->second.ttl == 0)
-            {
-                DisposeView(runtime->get_device(), view->second);
-                view = global_resources.erase(view);
-            }
-            else
-            {
-                if (!effects_reloading)
-                    view->second.ttl--;
-                view++;
-            }
+            DisposeView(runtime->get_device(), view->second);
+            view = global_resources.erase(view);
             continue;
-        }
-
-        // unitialized
-        if (view->second.state == GlobalResourceState::RESOURCE_UNINITIALIZED)
-        {
-            CreateViews(runtime->get_device(), view->second);
-            view->second.state = GlobalResourceState::RESOURCE_VALID;
         }
 
         if (view->second.state == GlobalResourceState::RESOURCE_USED)
@@ -333,7 +326,6 @@ void ResourceManager::CheckResourceViews(reshade::api::effect_runtime* runtime)
             view->second.state = GlobalResourceState::RESOURCE_VALID;
         }
 
-        view->second.ttl = GLOBAL_RESOURCE_TTL;
         view++;
     }
 }

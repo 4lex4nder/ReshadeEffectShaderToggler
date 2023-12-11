@@ -39,13 +39,11 @@ namespace Rendering
         RESOURCE_INVALID = 3,
     };
 
-    constexpr uint32_t GLOBAL_RESOURCE_TTL = 60;
-
     struct __declspec(novtable) GlobalResourceView final
     {
-        constexpr GlobalResourceView() : resource_handle { 0 }, rtv { 0 }, rtv_srgb { 0 }, srv { 0 }, srv_srgb { 0 }, state(GlobalResourceState::RESOURCE_UNINITIALIZED), ttl(GLOBAL_RESOURCE_TTL) { }
-        constexpr GlobalResourceView(uint64_t handle) : resource_handle{ handle }, rtv{ 0 }, rtv_srgb{ 0 }, srv{ 0 }, srv_srgb{ 0 }, state(GlobalResourceState::RESOURCE_UNINITIALIZED), ttl(GLOBAL_RESOURCE_TTL) { }
-        constexpr GlobalResourceView(reshade::api::resource_desc desc) : resource_handle { 0 }, rtv { 0 }, rtv_srgb{ 0 }, srv{ 0 }, srv_srgb{ 0 }, state(GlobalResourceState::RESOURCE_UNINITIALIZED), ttl(GLOBAL_RESOURCE_TTL){ }
+        constexpr GlobalResourceView() : resource_handle { 0 }, rtv { 0 }, rtv_srgb { 0 }, srv { 0 }, srv_srgb { 0 }, state(GlobalResourceState::RESOURCE_UNINITIALIZED) { }
+        constexpr GlobalResourceView(uint64_t handle) : resource_handle{ handle }, rtv{ 0 }, rtv_srgb{ 0 }, srv{ 0 }, srv_srgb{ 0 }, state(GlobalResourceState::RESOURCE_UNINITIALIZED) { }
+        constexpr GlobalResourceView(reshade::api::resource_desc desc) : resource_handle { 0 }, rtv { 0 }, rtv_srgb{ 0 }, srv{ 0 }, srv_srgb{ 0 }, state(GlobalResourceState::RESOURCE_UNINITIALIZED) { }
 
         uint64_t resource_handle;
         reshade::api::resource_view rtv;
@@ -53,7 +51,6 @@ namespace Rendering
         reshade::api::resource_view srv;
         reshade::api::resource_view srv_srgb;
         GlobalResourceState state;
-        uint32_t ttl;
     };
 
     class __declspec(novtable) ResourceManager final
@@ -85,7 +82,7 @@ namespace Rendering
         void OnEffectsReloading(reshade::api::effect_runtime* runtime);
         void OnEffectsReloaded(reshade::api::effect_runtime* runtime);
 
-        GlobalResourceView& GetResourceView(uint64_t handle);
+        GlobalResourceView& GetResourceView(reshade::api::device* device, uint64_t handle);
         void CheckResourceViews(reshade::api::effect_runtime* runtime);
 
         static EmbeddedResourceData GetResourceData(uint16_t id);

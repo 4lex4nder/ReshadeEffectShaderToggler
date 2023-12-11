@@ -32,7 +32,7 @@ bool RenderingEffectManager::RenderRemainingEffects(effect_runtime* runtime)
 
     resource res = runtime->get_current_back_buffer();
 
-    GlobalResourceView& view = resourceManager.GetResourceView(res.handle);
+    GlobalResourceView& view = resourceManager.GetResourceView(device, res.handle);
     resource_view active_rtv = view.rtv;
     resource_view active_rtv_srgb = view.rtv_srgb;
 
@@ -108,7 +108,7 @@ bool RenderingEffectManager::_RenderEffects(
         resource_view group_view = {};
         resource_desc desc = cmd_list->get_device()->get_resource_desc(active_resource);
         GroupResource& groupResource = group->GetGroupResource(GroupResourceType::RESOURCE_ALPHA);
-        GlobalResourceView& view = resourceManager.GetResourceView(active_resource.handle);
+        GlobalResourceView& view = resourceManager.GetResourceView(runtime->get_device(), active_resource.handle);
         bool copyPreserveAlpha = false;
 
         if (group->getPreserveAlpha())
@@ -281,7 +281,7 @@ void RenderingEffectManager::PreventRuntimeReload(reshade::api::effect_runtime* 
     if (runtimeData.specialEffects[REST_NOOP].technique != 0)
     {
         resource res = runtime->get_current_back_buffer();
-        GlobalResourceView& view = resourceManager.GetResourceView(res.handle);
+        GlobalResourceView& view = resourceManager.GetResourceView(runtime->get_device(), res.handle);
         resource_view active_rtv = view.rtv;
         resource_view active_rtv_srgb = view.rtv_srgb;
 

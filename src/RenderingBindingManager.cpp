@@ -208,7 +208,7 @@ void RenderingBindingManager::_UpdateTextureBindings(command_list* cmd_list,
 
             if (!group->getCopyTextureBinding())
             {
-                GlobalResourceView& view = resourceManager.GetResourceView(active_resource.handle);
+                GlobalResourceView& view = resourceManager.GetResourceView(runtime->get_device(), active_resource.handle);
                 resource_view view_non_srgb = view.srv;
                 resource_view view_srgb = view.rtv_srgb;
 
