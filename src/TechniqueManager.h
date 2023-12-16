@@ -12,7 +12,7 @@ namespace ShaderToggler
     class __declspec(novtable) TechniqueManager final
     {
     public:
-        TechniqueManager(ShaderToggler::KeyMonitor& keyMonitor, std::vector<std::string>& techniqueCollection);
+        TechniqueManager(ShaderToggler::KeyMonitor& keyMonitor);
 
         void OnReshadeReloadedEffects(reshade::api::effect_runtime* runtime);
         bool OnReshadeSetTechniqueState(reshade::api::effect_runtime* runtime, reshade::api::effect_technique technique, bool enabled);
@@ -26,7 +26,6 @@ namespace ShaderToggler
 
     private:
         KeyMonitor& keyMonitor;
-        std::vector<std::string>& allTechniques;
         std::vector<std::function<void(reshade::api::effect_runtime*)>> effectsReloadingCallback;
         std::vector<std::function<void(reshade::api::effect_runtime*)>> effectsReloadedCallback;
 

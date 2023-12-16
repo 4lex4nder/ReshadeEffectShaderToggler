@@ -4,6 +4,7 @@
 
 struct __declspec(novtable) EffectData final {
     constexpr EffectData() : rendered(false), enabled_in_screenshot(true), technique({}), timeout(-1) {}
+    constexpr EffectData(reshade::api::effect_technique tech) : rendered(false), enabled_in_screenshot(true), technique(tech), timeout(-1) {}
     constexpr EffectData(reshade::api::effect_technique tech, reshade::api::effect_runtime* runtime) : EffectData(tech, runtime, false) {}
     constexpr EffectData(reshade::api::effect_technique tech, reshade::api::effect_runtime* runtime, bool active)
     {
@@ -25,18 +26,11 @@ struct __declspec(novtable) EffectData final {
         technique = tech;
         enabled = active;
     }
-    constexpr EffectData(reshade::api::effect_technique tech, reshade::api::effect_runtime* runtime, bool active, std::string& tech_name, std::string& eff_name) : EffectData(tech, runtime, active)
-    {
-        technique_name = tech_name;
-        effect_name = eff_name;
-    }
 
-    bool rendered = false;
+    mutable bool rendered = false;
     bool enabled_in_screenshot = true;
     bool enabled = false;
     reshade::api::effect_technique technique = {};
-    std::string technique_name;
-    std::string effect_name;
     int32_t timeout = -1;
     std::chrono::steady_clock::time_point timeout_start;
 };

@@ -132,7 +132,7 @@ namespace ShaderToggler
         bool isEmpty() const { return _vertexShaderHashes.size() <= 0 && _pixelShaderHashes.size() <= 0; }
         int getId() const { return _id; }
         const std::unordered_set<std::string>& preferredTechniques() const { return _preferredTechniques; }
-        void setPreferredTechniques(std::unordered_set<std::string> techniques) { _preferredTechniques = techniques; }
+        void setPreferredTechniques(std::unordered_set<std::string>& techniques) { _preferredTechniques = techniques; }
         std::unordered_set<uint32_t> getPixelShaderHashes() const { return _pixelShaderHashes; }
         std::unordered_set<uint32_t> getVertexShaderHashes() const { return _vertexShaderHashes; }
         std::unordered_set<uint32_t> getComputeShaderHashes() const { return _computeShaderHashes; }
@@ -227,7 +227,7 @@ namespace ShaderToggler
         bool BindingEnabled() { return _isProvidingTextureBinding && _copyTextureBinding; }
         bool BindingClear() { return _clearBindings; }
         void AssignPreferredTechniqueData(std::unordered_map<std::string, EffectData>& allTechniques);
-        const std::vector<EffectData*>& GetPreferredTechniqueData();
+        const std::unordered_set<EffectData*>& GetPreferredTechniqueData();
 
     private:
         int _id;
@@ -266,7 +266,7 @@ namespace ShaderToggler
         bool _cbModePush = false;
         std::string _textureBindingName;
         std::unordered_set<std::string> _preferredTechniques;
-        std::vector<EffectData*> _preferredTechniqueData;
+        std::unordered_set<EffectData*> _preferredTechniqueData;
         std::unordered_map<std::string, std::tuple<uintptr_t, bool>> _varOffsetMapping;
         DescriptorCycle _cbCycle;
         DescriptorCycle _srvCycle;

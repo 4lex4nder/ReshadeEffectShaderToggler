@@ -69,9 +69,11 @@ void RenderingQueueManager::_CheckCallForCommandList(ShaderData& sData, CommandL
 
                 if (group->getAllowAllTechniques())
                 {
-                    for (const auto& [techName, techData] : runtimeData.allEnabledTechniques)
+                    auto& preferred = group->GetPreferredTechniqueData();
+
+                    for (const auto& techData : runtimeData.allEnabledTechniques)
                     {
-                        if (group->getHasTechniqueExceptions() && group->preferredTechniques().contains(techName))
+                        if (group->getHasTechniqueExceptions() && preferred.contains(techData))
                         {
                             continue;
                         }

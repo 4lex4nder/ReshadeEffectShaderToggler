@@ -126,13 +126,13 @@ namespace ShaderToggler
             const auto& techData = allTechniques.find(techName);
             if (techData != allTechniques.end())
             {
-                _preferredTechniqueData.push_back(&techData->second);
+                _preferredTechniqueData.emplace(&techData->second);
             }
         }
     }
 
 
-    const std::vector<EffectData*>& ToggleGroup::GetPreferredTechniqueData()
+    const std::unordered_set<EffectData*>& ToggleGroup::GetPreferredTechniqueData()
     {
         return _preferredTechniqueData;
     }
@@ -321,6 +321,26 @@ namespace ShaderToggler
     }
 
 
+    static std::vector<std::string> split(std::string& str, char delimiter)
+    {
+        std::vector<std::string> ret;
+
+        if (str.size() > 0) {
+            stringstream ss(str);
+
+            while (ss.good())
+            {
+                string substr;
+                getline(ss, substr, delimiter);
+
+                ret.push_back(substr);
+            }
+        }
+
+        return ret;
+    }
+
+
     void ToggleGroup::loadState(CDataFile& iniFile, int groupCounter)
     {
         if (groupCounter < 0)
@@ -441,14 +461,12 @@ namespace ShaderToggler
         _requeueAfterRTMatchingFailure = iniFile.GetBoolOrDefault("RequeueAfterRTMatchingFailure", sectionRoot, false);
 
         string techniques = iniFile.GetString("Techniques", sectionRoot);
-        if (techniques.size() > 0) {
-            stringstream ss(techniques);
 
-            while (ss.good())
+        vector<string> splitTech = split(techniques, ',');
+        if (splitTech.size() > 0) {
+            for (auto& tech : splitTech)
             {
-                string substr;
-                getline(ss, substr, ',');
-                _preferredTechniques.insert(substr);
+                _preferredTechniques.emplace(tech);
             }
         }
 

@@ -84,8 +84,7 @@ static ConstantCopyBase* constantCopy = nullptr;
 static bool constantHandlerHooked = false;
 
 static atomic_uint32_t g_activeCollectorFrameCounter = 0;
-static vector<string> allTechniques;
-static AddonUIData g_addonUIData(&g_pixelShaderManager, &g_vertexShaderManager, &g_computeShaderManager, constantHandler, &g_activeCollectorFrameCounter, &allTechniques);
+static AddonUIData g_addonUIData(&g_pixelShaderManager, &g_vertexShaderManager, &g_computeShaderManager, constantHandler, &g_activeCollectorFrameCounter);
 
 static KeyMonitor keyMonitor;
 static Rendering::ResourceManager resourceManager;
@@ -95,7 +94,7 @@ static Rendering::RenderingEffectManager renderingEffectManager(g_addonUIData, r
 static Rendering::RenderingBindingManager renderingBindingManager(g_addonUIData, resourceManager, groupResourceManager);
 static Rendering::RenderingPreviewManager renderingPreviewManager(g_addonUIData, resourceManager, renderingShaderManager);
 static Rendering::RenderingQueueManager renderingQueueManager(g_addonUIData, resourceManager);
-static ShaderToggler::TechniqueManager techniqueManager(keyMonitor, allTechniques);
+static ShaderToggler::TechniqueManager techniqueManager(keyMonitor);
 
 // TODO: actually implement ability to turn off srgb-view generation
 static vector<effect_runtime*> runtimes;

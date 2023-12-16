@@ -108,7 +108,6 @@ static void DisplayTechniqueSelection(reshade::api::effect_runtime* runtime, Add
 
     RuntimeDataContainer& runtimeData = runtime->get_private_data<RuntimeDataContainer>();
 
-    const std::vector<std::string>* techniquesPtr = instance.GetAllTechniques();
     std::unordered_set<std::string> curTechniques = group->preferredTechniques();
     std::unordered_set<std::string> newTechniques;
     static char searchBuf[256] = "\0";
@@ -168,23 +167,23 @@ static void DisplayTechniqueSelection(reshade::api::effect_runtime* runtime, Add
 
         std::string searchString(searchBuf);
 
-        if (techniquesPtr != nullptr)
+        if (runtimeData.allTechniques.size() > 0)
         {
-            for (const auto& technique : *techniquesPtr)
+            for (const auto& [name, effData] : runtimeData.allTechniques)
             {
-                bool enabled = curTechniques.contains(technique);
+                bool enabled = curTechniques.contains(name);
 
-                if (std::ranges::search(technique, searchString,
+                if (std::ranges::search(name, searchString,
                     [](const wchar_t lhs, const wchar_t rhs) {return lhs == rhs; },
-                    std::towupper, std::towupper).begin() != technique.end())
+                    std::towupper, std::towupper).begin() != name.end())
                 {
                     ImGui::TableNextColumn();
-                    ImGui::Checkbox(technique.c_str(), &enabled);
+                    ImGui::Checkbox(name.c_str(), &enabled);
                 }
 
                 if (enabled)
                 {
-                    newTechniques.insert(technique);
+                    newTechniques.insert(name);
                 }
             }
         }
@@ -200,13 +199,9 @@ static void DisplayTechniqueSelection(reshade::api::effect_runtime* runtime, Add
     group->setHasTechniqueExceptions(exceptions);
     group->setAllowAllTechniques(allowAll);
 
-    if (techniquesPtr != nullptr && techniquesPtr->size() > 0)
-    {
-        group->setPreferredTechniques(newTechniques);
-
-        std::unique_lock<std::shared_mutex> techLock(runtimeData.technique_mutex);
-        instance.AssignPreferredGroupTechniques(runtimeData.allTechniques);
-    }
+    group->setPreferredTechniques(newTechniques);
+    std::unique_lock<std::shared_mutex> techLock(runtimeData.technique_mutex);
+    instance.AssignPreferredGroupTechniques(runtimeData.allTechniques);
 }
 
 static void DrawPreview(unsigned long long textureId, uint32_t srcWidth, uint32_t srcHeight)

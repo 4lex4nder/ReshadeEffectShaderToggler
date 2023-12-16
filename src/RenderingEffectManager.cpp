@@ -41,11 +41,11 @@ bool RenderingEffectManager::RenderRemainingEffects(effect_runtime* runtime)
 
     for (auto& eff : runtimeData.allEnabledTechniques)
     {
-        if (!eff.second->rendered)
+        if (!eff->rendered)
         {
-            runtime->render_technique(eff.second->technique, cmd_list, active_rtv, active_rtv_srgb);
+            runtime->render_technique(eff->technique, cmd_list, active_rtv, active_rtv_srgb);
 
-            eff.second->rendered = true;
+            eff->rendered = true;
             rendered = true;
         }
     }
