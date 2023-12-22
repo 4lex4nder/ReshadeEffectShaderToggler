@@ -58,7 +58,7 @@ bool RenderingEffectManager::_RenderEffects(
     command_list* cmd_list,
     DeviceDataContainer& deviceData,
     RuntimeDataContainer& runtimeData,
-    const unordered_map<EffectData*, tuple<ToggleGroup*, uint64_t, resource>>& techniquesToRender,
+    const effect_queue& techniquesToRender,
     vector<EffectData*>& removalList,
     const unordered_set<EffectData*>& toRenderNames)
 {
@@ -80,12 +80,11 @@ bool RenderingEffectManager::_RenderEffects(
         if (sTech->first->enabled && !sTech->first->rendered && toRenderNames.contains(sTech->first))
         {
             const auto& [techName, techData] = *sTech;
-            const auto& [group, _, active_resource] = techData;
 
-            auto& [gEffects, gResource] = groupTechMap[group];
+            auto& [gEffects, gResource] = groupTechMap[techData.group];
 
             gEffects.push_back(sTech->first);
-            gResource = active_resource;
+            gResource = techData.resource;
         }
     }
 

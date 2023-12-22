@@ -82,7 +82,7 @@ void RenderingQueueManager::_CheckCallForCommandList(ShaderData& sData, CommandL
                         {
                             if (!sData.techniquesToRender.contains(techData))
                             {
-                                sData.techniquesToRender.emplace(techData, std::make_tuple(group, group->getInvocationLocation(), resource{ 0 }));
+                                sData.techniquesToRender.emplace(techData, ResourceRenderData{ group, group->getInvocationLocation(), resource{ 0 }, format::unknown });
                                 queue_mask |= (match_effect << (group->getInvocationLocation() * MATCH_DELIMITER)) | (match_effect << (CALL_DRAW * MATCH_DELIMITER));
                             }
                         }
@@ -95,7 +95,7 @@ void RenderingQueueManager::_CheckCallForCommandList(ShaderData& sData, CommandL
                     {
                         if (!eff->rendered && !sData.techniquesToRender.contains(eff))
                         {
-                            sData.techniquesToRender.emplace(eff, std::make_tuple(group, group->getInvocationLocation(), resource{ 0 }));
+                            sData.techniquesToRender.emplace(eff, ResourceRenderData{ group, group->getInvocationLocation(), resource{ 0 }, format::unknown });
                             queue_mask |= (match_effect << (group->getInvocationLocation() * MATCH_DELIMITER)) | (match_effect << (CALL_DRAW * MATCH_DELIMITER));
                         }
                     }
@@ -141,8 +141,8 @@ void RenderingQueueManager::_RescheduleGroups(ShaderData& sData, CommandListData
 
     for (const auto& tech : sData.techniquesToRender)
     {
-        const ToggleGroup* group = std::get<0>(tech.second);
-        const resource res = std::get<2>(tech.second);
+        const ToggleGroup* group = tech.second.group;
+        const resource res = tech.second.resource;
 
         if (res == 0 && group->getRequeueAfterRTMatchingFailure())
         {
@@ -209,7 +209,7 @@ static void clearStage(CommandListDataContainer& commandListData, effect_queue& 
     {
         for (auto it = queuedTasks.begin(); it != queuedTasks.end();)
         {
-            uint64_t callLocation = std::get<1>(it->second);
+            uint64_t callLocation = it->second.invocationLocation;
             if (callLocation == location)
             {
                 it = queuedTasks.erase(it);

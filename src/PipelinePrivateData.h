@@ -10,7 +10,16 @@
 #include "ToggleGroup.h"
 #include "EffectData.h"
 
-using effect_queue = std::unordered_map<EffectData*, std::tuple<ShaderToggler::ToggleGroup*, uint64_t, reshade::api::resource>>;
+struct __declspec(novtable) ResourceRenderData final {
+    constexpr ResourceRenderData(ShaderToggler::ToggleGroup* g, uint64_t i, reshade::api::resource r, reshade::api::format f) : group(g), invocationLocation(i), resource(r), format(f) { }
+
+    ShaderToggler::ToggleGroup* group;
+    uint64_t invocationLocation;
+    reshade::api::resource resource;
+    reshade::api::format format;
+};
+
+using effect_queue = std::unordered_map<EffectData*, ResourceRenderData>;
 using binding_queue = std::unordered_map<ShaderToggler::ToggleGroup*, std::tuple<uint64_t, reshade::api::resource>>;
 
 struct __declspec(novtable) ShaderData final {

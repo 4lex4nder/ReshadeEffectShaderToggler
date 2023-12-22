@@ -55,10 +55,18 @@ namespace Rendering
     constexpr uint64_t CHECK_MATCH_BIND_RENDERTARGET_BINDING = MATCH_BINDING << (CALL_BIND_RENDER_TARGET * MATCH_DELIMITER);
     constexpr uint64_t CHECK_MATCH_BIND_RENDERTARGET_PREVIEW = MATCH_PREVIEW << (CALL_BIND_RENDER_TARGET * MATCH_DELIMITER);
 
+    struct __declspec(novtable) ResourceViewData final {
+        constexpr ResourceViewData() : resource({ 0 }), format(reshade::api::format::unknown) { }
+        constexpr ResourceViewData(reshade::api::resource r, reshade::api::format f) : resource(r), format(f) { }
+
+        reshade::api::resource resource;
+        reshade::api::format format;
+    };
+
     class __declspec(novtable) RenderingManager final
     {
     public:
-        static const reshade::api::resource GetCurrentResourceView(reshade::api::command_list* cmd_list, DeviceDataContainer& deviceData, ShaderToggler::ToggleGroup* group, CommandListDataContainer& commandListData, uint32_t descIndex, uint64_t action);
+        static const ResourceViewData GetCurrentResourceView(reshade::api::command_list* cmd_list, DeviceDataContainer& deviceData, ShaderToggler::ToggleGroup* group, CommandListDataContainer& commandListData, uint32_t descIndex, uint64_t action);
         static bool check_aspect_ratio(float width_to_check, float height_to_check, uint32_t width, uint32_t height, uint32_t matchingMode);
         
         static void EnumerateTechniques(reshade::api::effect_runtime* runtime, std::function<void(reshade::api::effect_runtime*, reshade::api::effect_technique, std::string&, std::string&)> func);
@@ -66,7 +74,7 @@ namespace Rendering
             reshade::api::command_list* cmd_list,
             DeviceDataContainer& deviceData,
             CommandListDataContainer& commandListData,
-            std::unordered_map<EffectData*, std::tuple<ShaderToggler::ToggleGroup*, uint64_t, reshade::api::resource>>& queue,
+            effect_queue& queue,
             std::unordered_set<EffectData*>& immediateQueue,
             uint64_t callLocation,
             uint32_t layoutIndex,

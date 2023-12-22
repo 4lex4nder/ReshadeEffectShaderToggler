@@ -155,11 +155,11 @@ void RenderingBindingManager::_QueueOrDequeue(
         // Set views during draw call since we can be sure the correct ones are bound at that point
         if (!callLocation && view == 0)
         {
-            resource active_target = RenderingManager::GetCurrentResourceView(cmd_list, deviceData, group, commandListData, layoutIndex, action);
+            ResourceViewData active_data = RenderingManager::GetCurrentResourceView(cmd_list, deviceData, group, commandListData, layoutIndex, action);
 
-            if (active_target != 0)
+            if (active_data.resource != 0)
             {
-                view = active_target;
+                view = active_data.resource;
             }
             else if (group->getRequeueAfterRTMatchingFailure())
             {

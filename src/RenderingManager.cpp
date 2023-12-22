@@ -78,13 +78,13 @@ bool RenderingManager::check_aspect_ratio(float width_to_check, float height_to_
     return std::fabs(aspect_ratio) <= 0.1f && ((w_ratio <= 1.85f && w_ratio >= 0.5f && h_ratio <= 1.85f && h_ratio >= 0.5f) || (matchingMode == ShaderToggler::SWAPCHAIN_MATCH_MODE_EXTENDED_ASPECT_RATIO && std::modf(w_ratio, &w_ratio) <= 0.02f && std::modf(h_ratio, &h_ratio) <= 0.02f));
 }
 
-const resource RenderingManager::GetCurrentResourceView(command_list* cmd_list, DeviceDataContainer& deviceData, ToggleGroup* group, CommandListDataContainer& commandListData, uint32_t descIndex, uint64_t action)
+const ResourceViewData RenderingManager::GetCurrentResourceView(command_list* cmd_list, DeviceDataContainer& deviceData, ToggleGroup* group, CommandListDataContainer& commandListData, uint32_t descIndex, uint64_t action)
 {
-    resource active_target = { 0 };
+    ResourceViewData active_data;
 
     if (deviceData.current_runtime == nullptr)
     {
-        return active_target;
+        return active_data;
     }
 
     device* device = deviceData.current_runtime->get_device();
@@ -107,13 +107,13 @@ const resource RenderingManager::GetCurrentResourceView(command_list* cmd_list, 
         int32_t slot = std::min(static_cast<int32_t>(group->getBindingSRVSlotIndex()), slot_size - 1);
 
         if (slot_size <= 0)
-            return active_target;
+            return active_data;
 
         int32_t desc_size = static_cast<uint32_t>(state.get_root_table_entry_size_at(stageIndex, slot));
         int32_t desc = std::min(static_cast<int32_t>(group->getBindingSRVDescriptorIndex()), desc_size - 1);
 
         if (desc_size <= 0)
-            return active_target;
+            return active_data;
 
         const descriptor_tracking::descriptor_data* buf = state.get_descriptor_at(stageIndex, slot, desc);
 
@@ -147,8 +147,11 @@ const resource RenderingManager::GetCurrentResourceView(command_list* cmd_list, 
             }
         }
 
-        if(buf != nullptr)
-            active_target = buf->view != 0 ? device->get_resource_from_view(buf->view) : active_target;
+        if (buf != nullptr && buf->view != 0)
+        {
+            active_data.resource = device->get_resource_from_view(buf->view);
+            active_data.format = device->get_resource_view_desc(buf->view).format;
+        }
     }
     else if(action & MATCH_BINDING && !group->getExtractResourceViews() && rtvs.size() > 0 && rtvs[bindingRTindex] != 0)
     {
@@ -157,10 +160,11 @@ const resource RenderingManager::GetCurrentResourceView(command_list* cmd_list, 
         if (rs == 0)
         {
             // Render targets may not have a resource bound in D3D12, in which case writes to them are discarded
-            return active_target;
+            return active_data;
         }
 
         resource_desc desc = device->get_resource_desc(rs);
+        resource_view_desc v_desc = device->get_resource_view_desc(rtvs[index]);
 
         if (group->getBindingMatchSwapchainResolution() < ShaderToggler::SWAPCHAIN_MATCH_MODE_NONE)
         {
@@ -172,11 +176,12 @@ const resource RenderingManager::GetCurrentResourceView(command_list* cmd_list, 
                 (group->getBindingMatchSwapchainResolution() == ShaderToggler::SWAPCHAIN_MATCH_MODE_RESOLUTION &&
                     (width != desc.texture.width || height != desc.texture.height)))
             {
-                return active_target;
+                return active_data;
             }
         }
 
-        active_target = rs;
+        active_data.resource = rs;
+        active_data.format = v_desc.format;
     }
     else if (action & MATCH_EFFECT && rtvs.size() > 0 && rtvs[index] != 0)
     {
@@ -185,14 +190,16 @@ const resource RenderingManager::GetCurrentResourceView(command_list* cmd_list, 
         if (rs == 0)
         {
             // Render targets may not have a resource bound in D3D12, in which case writes to them are discarded
-            return active_target;
+            return active_data;
         }
 
         // Don't apply effects to non-RGB buffers
         resource_desc desc = device->get_resource_desc(rs);
+        resource_view_desc v_desc = device->get_resource_view_desc(rtvs[index]);
+
         if (!IsColorBuffer(desc.texture.format))
         {
-            return active_target;
+            return active_data;
         }
 
         // Make sure our target matches swap buffer dimensions when applying effects or it's explicitly requested
@@ -206,21 +213,22 @@ const resource RenderingManager::GetCurrentResourceView(command_list* cmd_list, 
                 (group->getMatchSwapchainResolution() == ShaderToggler::SWAPCHAIN_MATCH_MODE_RESOLUTION &&
                     (width != desc.texture.width || height != desc.texture.height)))
             {
-                return active_target;
+                return active_data;
             }
         }
 
-        active_target = rs;
+        active_data.resource = rs;
+        active_data.format = v_desc.format;
     }
 
-    return active_target;
+    return active_data;
 }
 
 void RenderingManager::QueueOrDequeue(
     command_list* cmd_list,
     DeviceDataContainer& deviceData,
     CommandListDataContainer& commandListData,
-    unordered_map<EffectData*, tuple<ShaderToggler::ToggleGroup*, uint64_t, reshade::api::resource>>& queue,
+    effect_queue& queue,
     unordered_set<EffectData*>& immediateQueue,
     uint64_t callLocation,
     uint32_t layoutIndex,
@@ -229,17 +237,17 @@ void RenderingManager::QueueOrDequeue(
     for (auto it = queue.begin(); it != queue.end();)
     {
         auto& [name, data] = *it;
-        auto& [group, loc, view] = data;
         // Set views during draw call since we can be sure the correct ones are bound at that point
-        if (!callLocation && view == 0)
+        if (!callLocation && data.resource == 0)
         {
-            resource active_target = GetCurrentResourceView(cmd_list, deviceData, group, commandListData, layoutIndex, action);
+            ResourceViewData active_data = GetCurrentResourceView(cmd_list, deviceData, data.group, commandListData, layoutIndex, action);
 
-            if (active_target != 0)
+            if (active_data.resource != 0)
             {
-                view = active_target;
+                data.resource = active_data.resource;
+                data.format = active_data.format;
             }
-            else if(group->getRequeueAfterRTMatchingFailure())
+            else if(data.group->getRequeueAfterRTMatchingFailure())
             {
                 // Leave loaded up in the effect/bind list and re-issue command on RT change
                 it++;
@@ -253,7 +261,7 @@ void RenderingManager::QueueOrDequeue(
         }
 
         // Queue updates depending on the place their supposed to be called at
-        if (view != 0 && (!callLocation && !loc || callLocation & loc))
+        if (data.resource != 0 && (!callLocation && !data.invocationLocation || callLocation & data.invocationLocation))
         {
             immediateQueue.insert(name);
         }
