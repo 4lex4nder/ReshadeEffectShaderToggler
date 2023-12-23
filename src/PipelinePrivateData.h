@@ -11,6 +11,7 @@
 #include "EffectData.h"
 
 struct __declspec(novtable) ResourceRenderData final {
+    constexpr ResourceRenderData() : group(nullptr), invocationLocation(0), resource({0}), format(reshade::api::format::unknown) { }
     constexpr ResourceRenderData(ShaderToggler::ToggleGroup* g, uint64_t i, reshade::api::resource r, reshade::api::format f) : group(g), invocationLocation(i), resource(r), format(f) { }
 
     ShaderToggler::ToggleGroup* group;
@@ -20,7 +21,7 @@ struct __declspec(novtable) ResourceRenderData final {
 };
 
 using effect_queue = std::unordered_map<EffectData*, ResourceRenderData>;
-using binding_queue = std::unordered_map<ShaderToggler::ToggleGroup*, std::tuple<uint64_t, reshade::api::resource>>;
+using binding_queue = std::unordered_map<ShaderToggler::ToggleGroup*, ResourceRenderData>;
 
 struct __declspec(novtable) ShaderData final {
     uint32_t activeShaderHash = -1;
@@ -82,6 +83,7 @@ struct __declspec(novtable) HuntPreview final
     uint32_t width = 0;
     uint32_t height = 0;
     reshade::api::format format = reshade::api::format::unknown;
+    reshade::api::format view_format = reshade::api::format::unknown;
     reshade::api::resource_desc target_desc;
     bool recreate_preview = false;
 

@@ -66,7 +66,7 @@ bool RenderingEffectManager::_RenderEffects(
     CommandListDataContainer& cmdData = cmd_list->get_private_data<CommandListDataContainer>();
     effect_runtime* runtime = deviceData.current_runtime;
 
-    unordered_map<ToggleGroup*, pair<vector<EffectData*>, resource>> groupTechMap;
+    unordered_map<ToggleGroup*, pair<vector<EffectData*>, ResourceRenderData>> groupTechMap;
 
     for (const auto& aTech : runtimeData.allSortedTechniques)
     {
@@ -84,7 +84,7 @@ bool RenderingEffectManager::_RenderEffects(
             auto& [gEffects, gResource] = groupTechMap[techData.group];
 
             gEffects.push_back(sTech->first);
-            gResource = techData.resource;
+            gResource = sTech->second;
         }
     }
 
@@ -93,7 +93,7 @@ bool RenderingEffectManager::_RenderEffects(
         const auto& group = tech.first;
         const auto& [effectList, active_resource] = tech.second;
 
-        if (active_resource == 0)
+        if (active_resource.resource == 0)
         {
             continue;
         }
@@ -101,18 +101,18 @@ bool RenderingEffectManager::_RenderEffects(
         resource_view view_non_srgb = {};
         resource_view view_srgb = {};
         resource_view group_view = {};
-        resource_desc desc = cmd_list->get_device()->get_resource_desc(active_resource);
+        resource_desc desc = cmd_list->get_device()->get_resource_desc(active_resource.resource);
         GroupResource& groupResource = group->GetGroupResource(GroupResourceType::RESOURCE_ALPHA);
-        GlobalResourceView& view = resourceManager.GetResourceView(runtime->get_device(), active_resource.handle);
+        GlobalResourceView& view = resourceManager.GetResourceView(runtime->get_device(), active_resource);
         bool copyPreserveAlpha = false;
 
         if (group->getPreserveAlpha())
         {
-            if (groupResourceManager.IsCompatibleWithGroupFormat(runtime->get_device(), GroupResourceType::RESOURCE_ALPHA, active_resource, group))
+            if (groupResourceManager.IsCompatibleWithGroupFormat(runtime->get_device(), GroupResourceType::RESOURCE_ALPHA, active_resource.resource, group))
             {
                 resource group_res = {};
                 groupResourceManager.SetGroupBufferHandles(group, GroupResourceType::RESOURCE_ALPHA, &group_res, &view_non_srgb, &view_srgb, &group_view);
-                cmd_list->copy_resource(active_resource, group_res);
+                cmd_list->copy_resource(active_resource.resource, group_res);
                 copyPreserveAlpha = true;
             }
             else
@@ -122,6 +122,7 @@ bool RenderingEffectManager::_RenderEffects(
 
                 groupResource.state = GroupResourceState::RESOURCE_INVALID;
                 groupResource.target_description = desc;
+                groupResource.view_format = active_resource.format;
             }
         }
         else

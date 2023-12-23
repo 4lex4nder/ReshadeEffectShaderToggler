@@ -13,7 +13,7 @@ namespace Rendering
 
         bool CreateTextureBinding(reshade::api::effect_runtime* runtime, reshade::api::resource* res, reshade::api::resource_view* srv, reshade::api::resource_view* rtv, const reshade::api::resource_desc& desc);
         bool CreateTextureBinding(reshade::api::effect_runtime* runtime, reshade::api::resource* res, reshade::api::resource_view* srv, reshade::api::resource_view* rtv, reshade::api::format format);
-        uint32_t UpdateTextureBinding(reshade::api::effect_runtime* runtime, ShaderToggler::ToggleGroup* group, reshade::api::resource res, const reshade::api::resource_desc& desc);
+        uint32_t UpdateTextureBinding(reshade::api::effect_runtime* runtime, ShaderToggler::ToggleGroup* group, reshade::api::resource res, const reshade::api::resource_desc& desc, reshade::api::format viewformat);
         void InitTextureBingings(reshade::api::effect_runtime* runtime);
         void DisposeTextureBindings(reshade::api::device* device);
         void UpdateTextureBindings(reshade::api::command_list* cmd_list, uint64_t callLocation = CALL_DRAW, uint64_t invocation = MATCH_NONE);

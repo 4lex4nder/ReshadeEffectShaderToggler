@@ -17,13 +17,13 @@ RenderingPreviewManager::~RenderingPreviewManager()
 {
 }
 
-const resource RenderingPreviewManager::GetCurrentPreviewResourceView(command_list* cmd_list, DeviceDataContainer& deviceData, const ToggleGroup* group, CommandListDataContainer& commandListData, uint32_t descIndex, uint64_t action)
+const ResourceViewData RenderingPreviewManager::GetCurrentPreviewResourceView(command_list* cmd_list, DeviceDataContainer& deviceData, const ToggleGroup* group, CommandListDataContainer& commandListData, uint32_t descIndex, uint64_t action)
 {
-    resource active_target = { 0 };
+    ResourceViewData active_data;
 
     if (deviceData.current_runtime == nullptr)
     {
-        return active_target;
+        return active_data;
     }
 
     device* device = deviceData.current_runtime->get_device();
@@ -41,11 +41,12 @@ const resource RenderingPreviewManager::GetCurrentPreviewResourceView(command_li
         if (rs == 0)
         {
             // Render targets may not have a resource bound in D3D12, in which case writes to them are discarded
-            return active_target;
+            return active_data;
         }
 
         // Don't apply effects to non-RGB buffers
         resource_desc desc = device->get_resource_desc(rs);
+        resource_view_desc view_desc = device->get_resource_view_desc(rtvs[index]);
 
         // Make sure our target matches swap buffer dimensions when applying effects or it's explicitly requested
         if (group->getMatchSwapchainResolution() < ShaderToggler::SWAPCHAIN_MATCH_MODE_NONE)
@@ -57,14 +58,15 @@ const resource RenderingPreviewManager::GetCurrentPreviewResourceView(command_li
                 !RenderingManager::check_aspect_ratio(static_cast<float>(desc.texture.width), static_cast<float>(desc.texture.height), width, height, group->getMatchSwapchainResolution())) ||
                 (group->getMatchSwapchainResolution() == ShaderToggler::SWAPCHAIN_MATCH_MODE_RESOLUTION && (width != desc.texture.width || height != desc.texture.height)))
             {
-                return active_target;
+                return active_data;
             }
         }
 
-        active_target = rs;
+        active_data.resource = rs;
+        active_data.format = view_desc.format;
     }
 
-    return active_target;
+    return active_data;
 }
 
 void RenderingPreviewManager::UpdatePreview(command_list* cmd_list, uint64_t callLocation, uint64_t invocation)
@@ -92,7 +94,7 @@ void RenderingPreviewManager::UpdatePreview(command_list* cmd_list, uint64_t cal
     // Set views during draw call since we can be sure the correct ones are bound at that point
     if (!callLocation && deviceData.huntPreview.target == 0)
     {
-        resource active_target = resource{ 0 };
+        ResourceViewData active_target;
 
         if (invocation & MATCH_PREVIEW_PS)
         {
@@ -107,13 +109,15 @@ void RenderingPreviewManager::UpdatePreview(command_list* cmd_list, uint64_t cal
             active_target = GetCurrentPreviewResourceView(cmd_list, deviceData, &group, commandListData, 2, invocation & MATCH_PREVIEW_CS);
         }
 
-        if (active_target != 0)
+        if (active_target.resource != 0)
         {
-            resource_desc desc = device->get_resource_desc(active_target);
+            resource_desc desc = device->get_resource_desc(active_target.resource);
             //cmd_list->get_private_data<state_tracking>().start_resource_barrier_tracking(res, resource_usage::render_target);
 
-            deviceData.huntPreview.target = active_target;
+            deviceData.huntPreview.target = active_target.resource;
+            deviceData.huntPreview.target_desc = desc;
             deviceData.huntPreview.format = desc.texture.format;
+            deviceData.huntPreview.view_format = active_target.format;
             deviceData.huntPreview.width = desc.texture.width;
             deviceData.huntPreview.height = desc.texture.height;
         }
@@ -139,7 +143,6 @@ void RenderingPreviewManager::UpdatePreview(command_list* cmd_list, uint64_t cal
 
         if (!resourceManager.IsCompatibleWithPreviewFormat(deviceData.current_runtime, rs))
         {
-            deviceData.huntPreview.target_desc = cmd_list->get_device()->get_resource_desc(rs);
             deviceData.huntPreview.recreate_preview = true;
         }
         else

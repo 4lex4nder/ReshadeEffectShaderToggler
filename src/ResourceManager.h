@@ -43,7 +43,6 @@ namespace Rendering
     {
         constexpr GlobalResourceView() : resource_handle { 0 }, rtv { 0 }, rtv_srgb { 0 }, srv { 0 }, srv_srgb { 0 }, state(GlobalResourceState::RESOURCE_UNINITIALIZED) { }
         constexpr GlobalResourceView(uint64_t handle) : resource_handle{ handle }, rtv{ 0 }, rtv_srgb{ 0 }, srv{ 0 }, srv_srgb{ 0 }, state(GlobalResourceState::RESOURCE_UNINITIALIZED) { }
-        constexpr GlobalResourceView(reshade::api::resource_desc desc) : resource_handle { 0 }, rtv { 0 }, rtv_srgb{ 0 }, srv{ 0 }, srv_srgb{ 0 }, state(GlobalResourceState::RESOURCE_UNINITIALIZED) { }
 
         uint64_t resource_handle;
         reshade::api::resource_view rtv;
@@ -82,7 +81,8 @@ namespace Rendering
         void OnEffectsReloading(reshade::api::effect_runtime* runtime);
         void OnEffectsReloaded(reshade::api::effect_runtime* runtime);
 
-        GlobalResourceView& GetResourceView(reshade::api::device* device, uint64_t handle);
+        GlobalResourceView& GetResourceView(reshade::api::device* device, const ResourceRenderData& data);
+        GlobalResourceView& GetResourceView(reshade::api::device* device, uint64_t handle, reshade::api::format format = reshade::api::format::unknown);
         void CheckResourceViews(reshade::api::effect_runtime* runtime);
 
         static EmbeddedResourceData GetResourceData(uint16_t id);
@@ -91,7 +91,7 @@ namespace Rendering
         reshade::api::resource_view dummy_rtv;
     private:
         void DisposeView(reshade::api::device* device, const GlobalResourceView& views);
-        void CreateViews(reshade::api::device* device, GlobalResourceView& gview);
+        void CreateViews(reshade::api::device* device, GlobalResourceView& gview, reshade::api::format format = reshade::api::format::unknown);
         static ResourceShimType ResolveResourceShimType(const std::string&);
 
         ResourceShimType _shimType = ResourceShimType::Resource_Shim_None;

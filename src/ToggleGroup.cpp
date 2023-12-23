@@ -59,9 +59,9 @@ namespace ShaderToggler
         _srvCycle = CYCLE_NONE;
         _rtCycle = CYCLE_NONE;
 
-        _group_buffers[static_cast<uint32_t>(GroupResourceType::RESOURCE_ALPHA)] = { {}, {}, {}, {}, {}, [&]() { return _preserveAlpha; }, [&]() { return false; }, GroupResourceState::RESOURCE_INVALID, true };
-        _group_buffers[static_cast<uint32_t>(GroupResourceType::RESOURCE_BINDING)] = { {}, {}, {}, {}, {}, [&]() { return _copyTextureBinding && _isProvidingTextureBinding; }, [&]() { return _clearBindings; }, GroupResourceState::RESOURCE_INVALID, true };
-        _group_buffers[static_cast<uint32_t>(GroupResourceType::RESOURCE_CONSTANTS_COPY)] = { {}, {}, {}, {}, {}, [&]() { return _extractConstants; }, [&]() { return false; }, GroupResourceState::RESOURCE_INVALID, true };
+        _group_buffers[static_cast<uint32_t>(GroupResourceType::RESOURCE_ALPHA)] = { {}, {}, {}, {}, {}, {}, [&]() { return _preserveAlpha; }, [&]() { return false; }, GroupResourceState::RESOURCE_INVALID, true };
+        _group_buffers[static_cast<uint32_t>(GroupResourceType::RESOURCE_BINDING)] = { {}, {}, {}, {}, {}, {}, [&]() { return _copyTextureBinding && _isProvidingTextureBinding; }, [&]() { return _clearBindings; }, GroupResourceState::RESOURCE_INVALID, true };
+        _group_buffers[static_cast<uint32_t>(GroupResourceType::RESOURCE_CONSTANTS_COPY)] = { {}, {}, {}, {}, {}, {}, [&]() { return _extractConstants; }, [&]() { return false; }, GroupResourceState::RESOURCE_INVALID, true };
     }
 
 

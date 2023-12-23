@@ -79,17 +79,15 @@ namespace ShaderToggler
     struct __declspec(novtable) GroupResource final
     {
         reshade::api::resource res;
+        reshade::api::format view_format;
         reshade::api::resource_view rtv;
         reshade::api::resource_view rtv_srgb;
         reshade::api::resource_view srv;
         reshade::api::resource_desc target_description;
         std::function<bool()> enabled;
         std::function<bool()> clear_on_miss;
-        //bool recreate;
         GroupResourceState state;
         bool owning;
-        //bool cleared;
-        //bool recreated;
     };
 
     class ToggleGroup
@@ -97,8 +95,7 @@ namespace ShaderToggler
     public:
         ToggleGroup(std::string name, int Id);
         ToggleGroup();
-        //ToggleGroup(ToggleGroup&&) noexcept = default;
-        ToggleGroup(const ToggleGroup& other); // no copy
+        ToggleGroup(const ToggleGroup& other);
 
         static int getNewGroupId();
 
