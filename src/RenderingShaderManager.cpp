@@ -142,25 +142,25 @@ void RenderingShaderManager::DestroyShaders(reshade::api::device* device)
 {
     if (copyPipeline != 0)
     {
-        device->destroy_pipeline(copyPipeline);
+        //device->destroy_pipeline(copyPipeline);
         copyPipeline = {};
     }
 
     if (copyPipelineAlpha != 0)
     {
-        device->destroy_pipeline(copyPipelineAlpha);
+        //device->destroy_pipeline(copyPipelineAlpha);
         copyPipelineAlpha = {};
     }
 
     if (copyPipelineLayout != 0)
     {
-        device->destroy_pipeline_layout(copyPipelineLayout);
+        //device->destroy_pipeline_layout(copyPipelineLayout);
         copyPipelineLayout = {};
     }
 
     if (copyPipelineSampler != 0)
     {
-        device->destroy_sampler(copyPipelineSampler);
+        //device->destroy_sampler(copyPipelineSampler);
         copyPipelineSampler = {};
     }
 }
