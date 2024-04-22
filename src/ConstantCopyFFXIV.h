@@ -54,7 +54,7 @@ namespace Shim
 
             static void detour_ffxiv_cbload0(uint64_t param_1, uint16_t* param_2, uint64_t param_3, D3D11_MAPPED_SUBRESOURCE* param_4);
             static uint64_t __fastcall detour_ffxiv_cbload1(uintptr_t param_1, ID3D11DeviceContext* param_2, D3D11_MAPPED_SUBRESOURCE* param_3, ID3D11Resource** param_4, uint64_t index);
-            static void __fastcall detour_ffxiv_memcpy(void* param_1, void* param_2, uintptr_t param_3);
+            static void __fastcall detour_ffxiv_memcpy(void* param_1, void* param_2, size_t param_3);
 
             static inline void set_host_resource_data_location(void* origin, size_t len, int64_t resource_handle, size_t index);
         };

@@ -186,7 +186,7 @@ uint64_t __fastcall ConstantCopyFFXIV::detour_ffxiv_cbload1(uintptr_t param_1, I
     return uVar5;
 }
 
-void __fastcall ConstantCopyFFXIV::detour_ffxiv_memcpy(void* param_1, void* param_2, uintptr_t param_3)
+void __fastcall ConstantCopyFFXIV::detour_ffxiv_memcpy(void* param_1, void* param_2, size_t param_3)
 {
     return org_ffxiv_memcpy(param_1, param_2, param_3);
 }
